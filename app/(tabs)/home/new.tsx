@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { supabase } from '../../../services/supabase';
 
 export default function NewJournalEntry() {
   const [text, setText] = useState("");
@@ -36,43 +35,19 @@ export default function NewJournalEntry() {
     setIsSaving(true);
 
     try {
-      
-    
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Insert journal entry into Supabase
-      // Insert journal entry into Supabase
-const { error } = await supabase
-.from("journals")
-.insert([
-  {
-    text: text.trim(),
-    feeling: mood !== null ? moods[mood].label : "Neutral",
-    user_id: 78, // 👈 fixed user id
-  },
-]);
+      Alert.alert("Success", "Journal entry saved successfully!");
 
-if (error) throw error;
-
-
-
-  // Reset form
-setText("");
-setMood(null);
-// Navigate back to journal list
-router.push("/(tabs)/journal");
-
+      // Reset form
+      setText("");
+      setMood(null);
+      // Navigate back to journal list
+      router.push("/(tabs)/journal");
     } catch (error: any) {
       console.error('Error saving journal entry:', error);
-      
-      let errorMessage = "Failed to save journal entry. Please try again.";
-      
-      if (error.message.includes('authenticated')) {
-        errorMessage = "Please sign in to save journal entries.";
-      } else if (error.message.includes('network') || error.code === 'ECONNREFUSED') {
-        errorMessage = "Network error. Please check your internet connection.";
-      }
-      
-      Alert.alert("Error", errorMessage);
+      Alert.alert("Error", "Failed to save journal entry. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -113,15 +88,13 @@ router.push("/(tabs)/journal");
           {moods.map((moodItem, index) => (
             <TouchableOpacity
               key={index}
-              className={`items-center p-3 rounded-2xl flex-1 mx-1 ${
-                mood === index ? "bg-blue-100 border-2 border-blue-500" : "bg-white border border-gray-200"
-              }`}
+              className={`items-center p-3 rounded-2xl flex-1 mx-1 ${mood === index ? "bg-blue-100 border-2 border-blue-500" : "bg-white border border-gray-200"
+                }`}
               onPress={() => setMood(index)}
             >
               <Text className="text-3xl mb-1">{moodItem.emoji}</Text>
-              <Text className={`text-xs font-medium ${
-                mood === index ? "text-blue-700" : "text-gray-600"
-              }`}>
+              <Text className={`text-xs font-medium ${mood === index ? "text-blue-700" : "text-gray-600"
+                }`}>
                 {moodItem.label}
               </Text>
             </TouchableOpacity>
@@ -139,7 +112,7 @@ router.push("/(tabs)/journal");
             <Text className="text-red-500 text-sm font-medium">Clear</Text>
           </TouchableOpacity>
         </View>
-        
+
         <TextInput
           value={text}
           onChangeText={setText}
@@ -161,19 +134,18 @@ router.push("/(tabs)/journal");
 
       {/* Action Buttons */}
       <View className="flex-row space-x-4 mb-8">
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => router.back()}
           className="flex-1 bg-gray-200 px-6 py-4 rounded-2xl items-center"
         >
           <Text className="text-gray-700 font-semibold">Cancel</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           onPress={handleSaveEntry}
           disabled={!text.trim() || isSaving}
-          className={`flex-1 px-6 py-4 rounded-2xl items-center ${
-            text.trim() && !isSaving ? "bg-blue-600" : "bg-blue-300"
-          }`}
+          className={`flex-1 px-6 py-4 rounded-2xl items-center ${text.trim() && !isSaving ? "bg-blue-600" : "bg-blue-300"
+            }`}
         >
           {isSaving ? (
             <ActivityIndicator color="white" />

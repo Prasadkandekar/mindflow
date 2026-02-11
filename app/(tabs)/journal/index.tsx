@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { supabase } from '../../../services/supabase';
 
 interface JournalEntry {
   id: number;
@@ -52,12 +51,50 @@ const JournalApp: React.FC = () => {
     getDeviceId();
   }, []);
 
-  // Fetch journal entries when month changes
+  // Static journal entries
   useEffect(() => {
-    if (deviceId) {
-      fetchJournalEntries();
-    }
-  }, [currentDate, deviceId]);
+    const staticEntries: JournalEntry[] = [
+      {
+        id: 1,
+        date: new Date().toISOString().split('T')[0],
+        time: '10:00 AM',
+        feeling: 'happy',
+        text: 'Had a great day today! Feeling very productive.',
+        summary: 'Productive and happy day',
+        emotions: {},
+        confidence_score: 0.95,
+        insights: {},
+        created_at: new Date().toISOString()
+      },
+      {
+        id: 2,
+        date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
+        time: '09:30 PM',
+        feeling: 'neutral',
+        text: 'A quiet day. Spent some time reading and relaxing.',
+        summary: 'Quiet, relaxing day',
+        emotions: {},
+        confidence_score: 0.88,
+        insights: {},
+        created_at: new Date(Date.now() - 86400000).toISOString()
+      },
+      {
+        id: 3,
+        date: new Date(Date.now() - 172800000).toISOString().split('T')[0],
+        time: '02:15 PM',
+        feeling: 'sad',
+        text: 'Feeling a bit low today. Hope tomorrow is better.',
+        summary: 'Feeling low',
+        emotions: {},
+        confidence_score: 0.85,
+        insights: {},
+        created_at: new Date(Date.now() - 172800000).toISOString()
+      }
+    ];
+    setJournalEntries(staticEntries);
+    setFilteredEntries(staticEntries);
+    setLoading(false);
+  }, []);
 
   const getDeviceId = async () => {
     try {
@@ -74,32 +111,13 @@ const JournalApp: React.FC = () => {
     }
   };
 
-  // Fetch journal entries from Supabase
+  // Fetch journal entries (Mocked)
   const fetchJournalEntries = async () => {
-    try {
-      setLoading(true);
-
-      const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-
-      const { data, error } = await supabase
-        .from('journals')
-        .select('*') // Add device_id filter if you have this column
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0])
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const entries = data || [];
-      setJournalEntries(entries);
-      setFilteredEntries(entries);
-    } catch (error) {
-      console.error('Error fetching journal entries:', error);
-      Alert.alert('Error', 'Failed to load journal entries');
-    } finally {
+    setLoading(true);
+    setTimeout(() => {
+      setFilteredEntries(journalEntries);
       setLoading(false);
-    }
+    }, 500);
   };
 
   // Create a new journal entry
@@ -119,7 +137,7 @@ const JournalApp: React.FC = () => {
       entry.feeling.toLowerCase().includes(query.toLowerCase()) ||
       (entry.summary && entry.summary.toLowerCase().includes(query.toLowerCase()))
     );
-    
+
     setFilteredEntries(filtered);
   };
 
@@ -399,24 +417,22 @@ const JournalApp: React.FC = () => {
                   className="w-10 h-10 items-center justify-center m-1"
                 >
                   <View
-                    className={`w-8 h-8 items-center justify-center rounded-full ${
-                      calendarDay.isSelected
+                    className={`w-8 h-8 items-center justify-center rounded-full ${calendarDay.isSelected
                         ? 'bg-primary'
                         : calendarDay.isToday
-                        ? 'bg-primary/20'
-                        : ''
-                    }`}
+                          ? 'bg-primary/20'
+                          : ''
+                      }`}
                   >
                     <Text
-                      className={`text-sm font-medium ${
-                        calendarDay.isSelected
+                      className={`text-sm font-medium ${calendarDay.isSelected
                           ? 'text-white'
                           : calendarDay.isToday
-                          ? 'text-primary font-semibold'
-                          : calendarDay.isCurrentMonth
-                          ? 'text-textPrimary'
-                          : 'text-textSecondary/50'
-                      }`}
+                            ? 'text-primary font-semibold'
+                            : calendarDay.isCurrentMonth
+                              ? 'text-textPrimary'
+                              : 'text-textSecondary/50'
+                        }`}
                     >
                       {calendarDay.day}
                     </Text>
@@ -474,8 +490,8 @@ const JournalApp: React.FC = () => {
             </View>
           ) : (
             filteredEntries.map((entry) => (
-              <TouchableOpacity 
-                key={entry.id} 
+              <TouchableOpacity
+                key={entry.id}
                 className="bg-white rounded-2xl p-4 mb-3 shadow-soft active:opacity-95"
                 onPress={() => handleJournalCardPress(entry.id)}
               >

@@ -8,12 +8,19 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarActiveTintColor: "#4A90E2", // Primary color
+        tabBarActiveTintColor: "#10b981", // Emerald 500 (Wellness theme)
+        tabBarInactiveTintColor: "#6b7280", // Gray 500
         tabBarStyle: {
           backgroundColor: "white",
           borderTopWidth: 1,
-          borderTopColor: "#e5e7eb", // Tailwind gray-200
-          height: 60,
+          borderTopColor: "#f3f4f6", // Gray 100
+          height: 65,
+          paddingBottom: 10,
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "500",
         },
       }}
     >
@@ -21,56 +28,51 @@ export default function TabsLayout() {
         name="home"
         options={{
           title: "Home",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "home" : "home-outline"} size={size} color={color} />
           ),
         }}
       />
 
       <Tabs.Screen
-            name="journal/index"
-            options={{
-            title: "Journals",
-            tabBarIcon: ({ color, size }) => (
-                <Ionicons name="journal" size={size} color={color} />
-            ),
-            }}
-        />
+        name="journal"
+        options={{
+          title: "Journal",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "journal" : "journal-outline"} size={size} color={color} />
+          ),
+        }}
+      />
 
-        <Tabs.Screen
-            name="insights/index"
-            options={{
-            title: "Insights",
-            tabBarIcon: ({ color, size }) => (
-                <Ionicons name="bar-chart" size={size} color={color} />
-            ),
-            }}
+      <Tabs.Screen
+        name="companion"
+        options={{
+          title: "Companion",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "mic" : "mic-outline"} size={size} color={color} />
+          ),
+        }}
+      />
 
-        />  
+      <Tabs.Screen
+        name="wellness"
+        options={{
+          title: "Wellness",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "leaf" : "leaf-outline"} size={size} color={color} />
+          ),
+        }}
+      />
 
-        <Tabs.Screen
-            name="support/index"
-            options={{
-            title: "Support",
-            tabBarIcon: ({ color, size }) => (
-                <Ionicons name="book" size={size} color={color} />
-            ),
-            }}
-            
-        />
-
-        <Tabs.Screen
-            name="profile/index"
-            options={{
-            title: "Profile",
-            tabBarIcon: ({ color, size }) => (
-                <Ionicons name="person" size={size} color={color} />
-            ),
-            }}
-        />
-
-
-     
+      <Tabs.Screen
+        name="tracker"
+        options={{
+          title: "Tracker",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "flame" : "flame-outline"} size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

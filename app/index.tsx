@@ -8,11 +8,12 @@ export default function SplashScreen() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      router.replace("/(tabs)/home/home");
+      router.replace("/(tabs)/home");
     }, 2000);
 
     return () => clearTimeout(timer);
   }, []);
+
 
   return (
     <View className="flex-1 bg-[#4A90E2] justify-center items-center">

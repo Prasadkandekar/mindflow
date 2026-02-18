@@ -3,78 +3,144 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
+const RecommendedCard = ({ title, subtitle, tag, color, onPress }: { title: string, subtitle: string, tag: string, color: string, onPress: () => void }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    activeOpacity={0.9}
+    className={`${color} w-64 h-80 rounded-[48px] p-8 mr-4 shadow-soft relative overflow-hidden`}
+  >
+    {/* Decorative Dashed Circle in Center */}
+    <View className="absolute inset-0 items-center justify-center opacity-20">
+      <View
+        className="w-32 h-32 rounded-full border-2 border-white border-dashed"
+      />
+      <View
+        className="w-16 h-16 rounded-full bg-white opacity-40 absolute"
+      />
+    </View>
+
+    <View className="flex-row justify-between items-start z-10">
+      <View className="bg-white/30 px-4 py-1.5 rounded-full">
+        <Text className="text-textPrimary font-bold text-[10px] uppercase tracking-wider">{tag}</Text>
+      </View>
+      <View className="w-10 h-10 rounded-full bg-white/30 items-center justify-center">
+        <Ionicons name="play" size={18} color="#2D1E17" />
+      </View>
+    </View>
+
+    <View className="flex-1" />
+
+    <View className="z-10">
+      <Text className="text-textPrimary font-bold text-2xl leading-tight mb-1">{title}</Text>
+      <Text className="text-textPrimary/60 font-medium text-sm">{subtitle}</Text>
+    </View>
+  </TouchableOpacity>
+);
+
+const CategoryCard = ({ title, icon, color, onPress, count }: { title: string, icon: any, color: string, onPress: () => void, count: string }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    className="bg-white p-5 rounded-[32px] mb-4 flex-row items-center justify-between shadow-card border border-secondary/10"
+  >
+    <View className="flex-row items-center">
+      <View className={`${color} w-14 h-14 rounded-2xl items-center justify-center mr-4 shadow-soft`}>
+        <Ionicons name={icon} size={28} color="white" />
+      </View>
+      <View>
+        <Text className="text-textPrimary font-bold text-lg">{title}</Text>
+        <Text className="text-textSecondary text-xs font-medium">{count} activities</Text>
+      </View>
+    </View>
+    <View className="w-8 h-8 rounded-full bg-background items-center justify-center">
+      <Ionicons name="chevron-forward" size={18} color="#FF7B1B" />
+    </View>
+  </TouchableOpacity>
+);
+
 export default function WellnessHubScreen() {
   const router = useRouter();
 
-  const CategoryCard = ({ title, icon, color, route, count }: { title: string, icon: any, color: string, route: any, count: string }) => (
-    <TouchableOpacity
-      onPress={() => router.push(route)}
-      className="bg-white p-6 rounded-[32px] mb-4 flex-row items-center justify-between border border-gray-100 shadow-sm"
-    >
-      <View className="flex-row items-center">
-        <View className={`${color} w-14 h-14 rounded-2xl items-center justify-center mr-4 shadow-sm`}>
-          <Ionicons name={icon} size={28} color="white" />
-        </View>
-        <View>
-          <Text className="text-gray-900 font-bold text-lg">{title}</Text>
-          <Text className="text-gray-400 text-xs">{count} activities</Text>
-        </View>
-      </View>
-      <Ionicons name="chevron-forward" size={24} color="#e2e8f0" />
-    </TouchableOpacity>
-  );
-
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
-      <View className="px-6 py-6 border-b border-gray-100 bg-white">
-        <Text className="text-3xl font-bold">Wellness Hub 🌿</Text>
+    <SafeAreaView className="flex-1 bg-background">
+      <View className="px-6 py-6 flex-row justify-between items-center">
+        <View className="w-10 h-10 rounded-full bg-textPrimary items-center justify-center">
+          <Ionicons name="leaf" size={20} color="white" />
+        </View>
+        <TouchableOpacity className="w-10 h-10 rounded-full bg-white items-center justify-center shadow-card">
+          <Ionicons name="search" size={20} color="#2D1E17" />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView className="p-6">
-        <View className="mb-6">
-          <Text className="text-gray-500 font-medium leading-relaxed">
-            Take a moment for yourself. Choose a category below to explore curated wellness activities.
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View className="px-6 mb-8">
+          <Text className="text-textSecondary font-bold text-sm uppercase tracking-widest mb-1">Daily Practices</Text>
+          <Text className="text-4xl font-bold text-textPrimary leading-tight">
+            Exercises based on your <Text className="text-primary italic">needs</Text>
           </Text>
         </View>
 
-        <CategoryCard
-          title="Breathing"
-          icon="air"
-          color="bg-blue-400"
-          route="/wellness/breathing"
-          count="12"
-        />
-        <CategoryCard
-          title="Exercises"
-          icon="body"
-          color="bg-emerald-400"
-          route="/wellness/exercises"
-          count="8"
-        />
-        <CategoryCard
-          title="Relaxation Sounds"
-          icon="musical-notes"
-          color="bg-purple-400"
-          route="/wellness/sounds"
-          count="15"
-        />
-        <CategoryCard
-          title="Mindfulness"
-          icon="sunny"
-          color="bg-rose-400"
-          route="/wellness/index"
-          count="10"
-        />
-
-        <View className="mt-8 bg-indigo-50 p-8 rounded-[40px] items-center border border-indigo-100">
-          <Ionicons name="sparkles" size={32} color="#6366f1" />
-          <Text className="text-indigo-900 font-bold text-xl mt-4 text-center">Daily Recommendation</Text>
-          <Text className="text-indigo-600 text-center mt-2 mb-6">"5-min Afternoon Focus Reset"</Text>
-          <TouchableOpacity className="bg-indigo-600 px-8 py-3 rounded-2xl">
-            <Text className="text-white font-bold">Start Now</Text>
-          </TouchableOpacity>
+        {/* Recommended Section */}
+        <View className="mb-10">
+          <View className="flex-row justify-between items-center px-6 mb-6">
+            <Text className="text-textPrimary text-xl font-bold">Recommended for You</Text>
+            <TouchableOpacity>
+              <Text className="text-textSecondary font-bold text-sm">See all</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 24 }}
+          >
+            <RecommendedCard
+              tag="Focus"
+              title={"3-Min\nBreathing"}
+              subtitle="Quick reset for anxiety"
+              color="bg-[#CEDDFB]"
+              onPress={() => router.push("/wellness/breathing")}
+            />
+            <RecommendedCard
+              tag="Journal"
+              title={"Gratitude\nShift"}
+              subtitle="Shift your perspective"
+              color="bg-[#F9E7B3]"
+              onPress={() => router.push("/(tabs)/journal")}
+            />
+            <RecommendedCard
+              tag="Relax"
+              title={"Night\nSounds"}
+              subtitle="Drift into deep sleep"
+              color="bg-[#FFD1B0]"
+              onPress={() => router.push("/wellness/sounds")}
+            />
+          </ScrollView>
         </View>
-        <View className="h-10" />
+
+        <View className="px-6 mb-20">
+          <Text className="text-textPrimary text-xl font-bold mb-6">Explore Tools</Text>
+          <CategoryCard
+            title="Breathing"
+            icon="water"
+            color="bg-primary"
+            onPress={() => router.push("/wellness/breathing")}
+            count="12"
+          />
+          <CategoryCard
+            title="Exercises"
+            icon="fitness"
+            color="bg-mood-calm"
+            onPress={() => router.push("/wellness/exercises")}
+            count="8"
+          />
+          <CategoryCard
+            title="Relaxation Sounds"
+            icon="musical-notes"
+            color="bg-accent"
+            onPress={() => router.push("/wellness/sounds")}
+            count="15"
+          />
+        </View>
+        <View className="h-24" />
       </ScrollView>
     </SafeAreaView>
   );

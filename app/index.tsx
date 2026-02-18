@@ -1,4 +1,4 @@
-// app/index.tsx
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
@@ -9,28 +9,36 @@ export default function SplashScreen() {
   useEffect(() => {
     const timer = setTimeout(() => {
       router.replace("/(tabs)/home");
-    }, 2000);
+    }, 2500);
 
     return () => clearTimeout(timer);
   }, []);
 
-
   return (
-    <View className="flex-1 bg-[#4A90E2] justify-center items-center">
-      {/* App Logo */}
-      <Text className="text-[50px] mb-5">🔒❤️</Text>
+    <LinearGradient
+      colors={["#FFD1B0", "#FFF9F5"]}
+      className="flex-1 justify-center items-center"
+    >
+      <View className="items-center">
+        {/* App Logo/Icon Container */}
+        <View className="w-40 h-40 bg-white rounded-[50px] shadow-soft justify-center items-center mb-8">
+          <Text className="text-[70px]">🌙</Text>
+        </View>
 
-      {/* App Name */}
-      <Text className="text-[28px] text-white font-semibold">MoonDiary</Text>
-      <Text className="text-[16px] text-white mt-2">Secure Mental Health Journal</Text>
+        {/* App Name */}
+        <Text className="text-[36px] text-textPrimary font-bold tracking-tight">MoonDiary</Text>
+        <Text className="text-[18px] text-textSecondary mt-2 font-medium">Your Mindful Space</Text>
 
-      {/* Loading Animation */}
-      <ActivityIndicator size="large" color="#fff" className="mt-5" />
+        {/* Loading Animation */}
+        <ActivityIndicator size="small" color="#FF7B1B" className="mt-12" />
+      </View>
 
       {/* Encryption Badge */}
-      <Text className="absolute bottom-10 text-[14px] text-white">
-        🔒 End-to-End Encrypted
-      </Text>
-    </View>
+      <View className="absolute bottom-12 flex-row items-center bg-white/50 px-4 py-2 rounded-full">
+        <Text className="text-[12px] text-textSecondary font-semibold">
+          🔒 End-to-End Encrypted
+        </Text>
+      </View>
+    </LinearGradient>
   );
 }

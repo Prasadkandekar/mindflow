@@ -1,14 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { FlatList, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { supabase } from '../../../services/supabase';
 
-const JOURNAL_ENTRIES = [
-  { id: '1', date: 'Feb 16', title: 'Productive Monday', rating: 4, mood: 'Positive', preview: 'Today I managed to finish all my tasks ahead of schedule...' },
-  { id: '2', date: 'Feb 15', title: 'Late Night Thoughts', rating: 3, mood: 'Neutral', preview: 'Feeling a bit tired today, but generally okay. Need to sleep early...' },
-  { id: '3', date: 'Feb 14', title: 'Amazing Valentine Dinner', rating: 5, mood: 'Positive', preview: 'The dinner was spectacular and the company was even better...' },
-  { id: '4', date: 'Feb 13', title: 'Dealing with Stress', rating: 2, mood: 'Difficult', preview: 'A lot of pressure at work today, struggling to keep calm...' },
-];
+const ACTOR_ID = '6ceaaeea-91f5-427d-bb4e-d651e2a2fd61';
+
+interface JournalEntry {
+  id: string;
+  content: string;
+  entry_date: string;
+  sentiment_analysis?: {
+    sentiment_score: number;
+    emotion_label: string;
+  };
+}
 
 const FilterButton = ({ label, active, onPress }: { label: string, active: boolean, onPress: () => void }) => (
   <TouchableOpacity
@@ -19,35 +25,98 @@ const FilterButton = ({ label, active, onPress }: { label: string, active: boole
   </TouchableOpacity>
 );
 
-const EntryCard = ({ item, onPress }: { item: typeof JOURNAL_ENTRIES[0], onPress: () => void }) => (
-  <TouchableOpacity
-    onPress={onPress}
-    className="bg-white p-5 rounded-[32px] mb-4 shadow-card border border-secondary/10"
-  >
-    <View className="flex-row justify-between items-start mb-2">
-      <View>
-        <Text className="text-textSecondary font-bold text-[10px] uppercase tracking-widest">{item.date}</Text>
-        <Text className="text-textPrimary font-bold text-lg">{item.title}</Text>
+const EntryCard = ({ item, onPress }: { item: JournalEntry, onPress: () => void }) => {
+  const date = new Date(item.entry_date);
+  const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const title = item.content.split('\n')[0].substring(0, 25) + (item.content.split('\n')[0].length > 25 ? '...' : '');
+  const preview = item.content.length > 80 ? item.content.substring(0, 80) + '...' : item.content;
+  const sentimentScore = item.sentiment_analysis?.sentiment_score ?? 0.5;
+  const rating = Math.ceil(sentimentScore * 5);
+  const mood = item.sentiment_analysis?.emotion_label || 'Neutral';
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      className="bg-white p-5 rounded-[32px] mb-4 shadow-card border border-secondary/10"
+    >
+      <View className="flex-row justify-between items-start mb-2">
+        <View>
+          <Text className="text-textSecondary font-bold text-[10px] uppercase tracking-widest">{formattedDate}</Text>
+          <Text className="text-textPrimary font-bold text-lg">{title}</Text>
+        </View>
+        <View className="flex-row bg-background px-2 py-1 rounded-full">
+          {[...Array(5)].map((_, i) => (
+            <Ionicons key={i} name="star" size={10} color={i < rating ? "#FF7B1B" : "#D4C5BD"} />
+          ))}
+        </View>
       </View>
-      <View className="flex-row bg-background px-2 py-1 rounded-full">
-        {[...Array(5)].map((_, i) => (
-          <Ionicons key={i} name="star" size={10} color={i < item.rating ? "#FF7B1B" : "#D4C5BD"} />
-        ))}
+      <Text className="text-textSecondary text-sm leading-relaxed" numberOfLines={2}>{preview}</Text>
+      <View className="mt-4 flex-row items-center justify-between">
+        <View className={`px-4 py-1.5 rounded-full ${sentimentScore > 0.6 ? 'bg-mood-happy/10' : 'bg-mood-stressed/10'}`}>
+          <Text className={`text-[10px] font-bold uppercase tracking-wider ${sentimentScore > 0.6 ? 'text-primary' : 'text-textSecondary'}`}>{mood}</Text>
+        </View>
+        <Ionicons name="arrow-forward-circle" size={24} color="#FF7B1B" />
       </View>
-    </View>
-    <Text className="text-textSecondary text-sm leading-relaxed" numberOfLines={2}>{item.preview}</Text>
-    <View className="mt-4 flex-row items-center justify-between">
-      <View className={`px-4 py-1.5 rounded-full ${item.mood === 'Positive' ? 'bg-mood-happy/10' : 'bg-mood-stressed/10'}`}>
-        <Text className={`text-[10px] font-bold uppercase tracking-wider ${item.mood === 'Positive' ? 'text-primary' : 'text-textSecondary'}`}>{item.mood}</Text>
-      </View>
-      <Ionicons name="arrow-forward-circle" size={24} color="#FF7B1B" />
-    </View>
-  </TouchableOpacity>
-);
+    </TouchableOpacity>
+  );
+};
 
 export default function JournalScreen() {
   const router = useRouter();
   const [filter, setFilter] = useState('All');
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchEntries = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('journals')
+        .select(`
+                    id,
+                    content,
+                    entry_date,
+                    sentiment_analysis (
+                        sentiment_score,
+                        emotion_label
+                    )
+                `)
+        .eq('user_id', ACTOR_ID)
+        .order('entry_date', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedEntries = data.map(entry => ({
+        ...entry,
+        sentiment_analysis: Array.isArray(entry.sentiment_analysis)
+          ? entry.sentiment_analysis[0]
+          : entry.sentiment_analysis
+      }));
+
+      setEntries(formattedEntries);
+    } catch (error) {
+      console.error('Error fetching journals:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEntries();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchEntries();
+  };
+
+  const filteredEntries = entries.filter(entry => {
+    if (filter === 'All') return true;
+    if (filter === 'Positive') return (entry.sentiment_analysis?.sentiment_score ?? 0) > 0.6;
+    if (filter === 'Difficult Days') return (entry.sentiment_analysis?.sentiment_score ?? 0) <= 0.4;
+    return true;
+  });
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -69,13 +138,36 @@ export default function JournalScreen() {
         </ScrollView>
       </View>
 
-      <FlatList
-        data={JOURNAL_ENTRIES}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <EntryCard item={item} onPress={() => router.push('/journal/entry-detail')} />}
-        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#FF7B1B" />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredEntries}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <EntryCard
+              item={item}
+              onPress={() => router.push({
+                pathname: '/journal/entry-detail',
+                params: { id: item.id }
+              })}
+            />
+          )}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#FF7B1B']} />
+          }
+          ListEmptyComponent={
+            <View className="items-center justify-center mt-20">
+              <Ionicons name="journal-outline" size={64} color="#D4C5BD" />
+              <Text className="text-textSecondary mt-4 font-medium">No journal entries found</Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }

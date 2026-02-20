@@ -1,14 +1,39 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React from 'react';
-import { SafeAreaView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+  ActivityIndicator,
+  SafeAreaView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { fetchToken } from '@/hooks/useConnectionDetails';
 
 export default function VoiceCompanionScreen() {
   const router = useRouter();
+  const [isConnecting, setIsConnecting] = useState(false);
 
-  const startSession = () => {
-    router.push('/companion/active-session');
+  const startSession = async () => {
+    try {
+      setIsConnecting(true);
+      const details = await fetchToken();
+      setIsConnecting(false);
+
+      if (details?.token) {
+        router.push({
+          pathname: '/companion/active-session',
+          params: { token: details.token, url: details.url },
+        });
+      } else {
+        console.error('Could not fetch LiveKit token');
+      }
+    } catch (error) {
+      setIsConnecting(false);
+      console.error('Connection error:', error);
+    }
   };
 
   return (
@@ -33,6 +58,7 @@ export default function VoiceCompanionScreen() {
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={startSession}
+          disabled={isConnecting}
           className="relative items-center justify-center mb-12"
         >
           <View className="w-64 h-64 rounded-full bg-primary opacity-10 absolute" />
@@ -41,7 +67,11 @@ export default function VoiceCompanionScreen() {
             className="w-56 h-56 rounded-full shadow-soft items-center justify-center"
           >
             <View className="w-48 h-48 rounded-full bg-white/20 border border-white/40 items-center justify-center">
-              <Ionicons name="mic" size={64} color="white" />
+              {isConnecting ? (
+                <ActivityIndicator size="large" color="white" />
+              ) : (
+                <Ionicons name="mic" size={64} color="white" />
+              )}
             </View>
           </LinearGradient>
 
@@ -59,9 +89,12 @@ export default function VoiceCompanionScreen() {
 
         <TouchableOpacity
           onPress={startSession}
+          disabled={isConnecting}
           className="bg-primary/10 px-6 py-3 rounded-2xl mb-8"
         >
-          <Text className="text-primary font-bold text-lg">Tap to Start Talking</Text>
+          <Text className="text-primary font-bold text-lg">
+            {isConnecting ? 'Connecting...' : 'Tap to Start Talking'}
+          </Text>
         </TouchableOpacity>
 
         <Text className="text-textPrimary text-2xl font-bold text-center px-4 leading-tight">
@@ -98,9 +131,14 @@ export default function VoiceCompanionScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={startSession}
+            disabled={isConnecting}
             className="w-12 h-12 bg-white rounded-full items-center justify-center ml-2"
           >
-            <Ionicons name="arrow-up" size={20} color="#2D1E17" />
+            {isConnecting ? (
+              <ActivityIndicator size="small" color="#2D1E17" />
+            ) : (
+              <Ionicons name="arrow-up" size={20} color="#2D1E17" />
+            )}
           </TouchableOpacity>
         </View>
       </View>

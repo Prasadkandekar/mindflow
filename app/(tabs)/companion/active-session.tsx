@@ -1,4 +1,5 @@
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Platform,
@@ -39,10 +40,13 @@ function NativeSessionScreen() {
   const LiveKitRoom = livekit?.LiveKitRoom;
 
   const { token, url } = useLocalSearchParams<{ token: string; url: string }>();
+  const [audioSessionReady, setAudioSessionReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!AudioSession) {
       console.error('[AudioSession] LiveKit AudioSession is not available. Ensure you are running a development build.');
+      setError('LiveKit AudioSession not available');
       return;
     }
 
@@ -51,8 +55,10 @@ function NativeSessionScreen() {
         console.log('[AudioSession] Starting audio session...');
         await AudioSession.startAudioSession();
         console.log('[AudioSession] Audio session started successfully');
+        setAudioSessionReady(true);
       } catch (e) {
         console.error('[AudioSession] Failed to start audio session:', e);
+        setError(`Audio session failed: ${e}`);
       }
     };
 
@@ -60,7 +66,11 @@ function NativeSessionScreen() {
 
     return () => {
       console.log('[AudioSession] Stopping audio session...');
-      AudioSession.stopAudioSession();
+      try {
+        AudioSession.stopAudioSession();
+      } catch (e) {
+        console.error('[AudioSession] Error stopping audio session:', e);
+      }
     };
   }, [AudioSession]);
 
@@ -78,6 +88,19 @@ function NativeSessionScreen() {
     );
   }
 
+  if (error) {
+    console.error('[LiveKit] Error state:', error);
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Animated.Text style={{ textAlign: 'center', color: 'red' }}>
+            Error: {error}
+          </Animated.Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (!token || !url) {
     console.error('[LiveKit] Missing connection details - token:', !!token, 'url:', !!url);
     return (
@@ -85,6 +108,19 @@ function NativeSessionScreen() {
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <Animated.Text style={{ textAlign: 'center' }}>
             Missing connection details. Please try again.
+          </Animated.Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!audioSessionReady) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <ActivityIndicator size="large" color="#FF7B1B" />
+          <Animated.Text style={{ textAlign: 'center', marginTop: 16 }}>
+            Initializing audio session...
           </Animated.Text>
         </View>
       </SafeAreaView>
@@ -112,6 +148,7 @@ function NativeSessionScreen() {
         }}
         onError={(error : any) => {
           console.error('[LiveKit] ⚠️ Room error:', error);
+          setError(`LiveKit error: ${error}`);
         }}
       >
         <RoomView />
@@ -135,9 +172,43 @@ const RoomView = () => {
 
   const router = useRouter();
   const room = useRoomContext();
+  const [roomError, setRoomError] = useState<string | null>(null);
+
+  // Wrap room context usage in try-catch
+  useEffect(() => {
+    if (!room) {
+      console.error('[RoomView] Room context is null');
+      setRoomError('Room context not available');
+    }
+  }, [room]);
+
+  if (roomError) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <Animated.Text style={{ textAlign: 'center', color: 'red' }}>
+          Room Error: {roomError}
+        </Animated.Text>
+      </View>
+    );
+  }
+
+  if (!room) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <ActivityIndicator size="large" color="#FF7B1B" />
+        <Animated.Text style={{ textAlign: 'center', marginTop: 16 }}>
+          Connecting to room...
+        </Animated.Text>
+      </View>
+    );
+  }
 
   if (useIOSAudioManagement && room) {
-    useIOSAudioManagement(room, true);
+    try {
+      useIOSAudioManagement(room, true);
+    } catch (e) {
+      console.error('[RoomView] iOS audio management error:', e);
+    }
   }
 
   const {

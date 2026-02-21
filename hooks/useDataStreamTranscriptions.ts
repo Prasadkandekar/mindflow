@@ -24,91 +24,131 @@ function useDataStreamTranscriptionsWeb(): TranscriptionsState {
 
 // ─── Native implementation ────────────────────────────────────────────────────
 function useDataStreamTranscriptionsNative(): TranscriptionsState {
-    const { useRoomContext, useVoiceAssistant } = require('@livekit/components-react');
-    const { TextStreamReader } = require('livekit-client');
+    try {
+        const { useRoomContext, useVoiceAssistant } = require('@livekit/components-react');
+        const { TextStreamReader } = require('livekit-client');
 
-    const room = useRoomContext();
-    const { agent } = useVoiceAssistant();
-    const agentIdentity = agent?.identity;
+        const room = useRoomContext();
+        const { agent } = useVoiceAssistant();
+        const agentIdentity = agent?.identity;
 
-    const [transcriptionMap] = useState<Map<string, Transcription>>(new Map());
-    const [transcriptions, setTranscriptions] = useState<Transcription[]>([]);
+        const [transcriptionMap] = useState<Map<string, Transcription>>(new Map());
+        const [transcriptions, setTranscriptions] = useState<Transcription[]>([]);
 
-    const mergeTranscriptions = useCallback(
-        (merge: Transcription[]) => {
-            for (const transcription of merge) {
-                const existing = transcriptionMap.get(transcription.segment.id);
-                transcriptionMap.set(transcription.segment.id, {
-                    identity: transcription.identity,
-                    segment: mergeTranscriptionSegment(existing?.segment, transcription.segment),
-                });
-            }
+        const mergeTranscriptions = useCallback(
+            (merge: Transcription[]) => {
+                for (const transcription of merge) {
+                    const existing = transcriptionMap.get(transcription.segment.id);
+                    transcriptionMap.set(transcription.segment.id, {
+                        identity: transcription.identity,
+                        segment: mergeTranscriptionSegment(existing?.segment, transcription.segment),
+                    });
+                }
 
-            const sortedTranscriptions = Array.from(transcriptionMap.values()).sort(
-                (a, b) => b.segment.firstReceivedTime - a.segment.firstReceivedTime
-            );
+                const sortedTranscriptions = Array.from(transcriptionMap.values()).sort(
+                    (a, b) => b.segment.firstReceivedTime - a.segment.firstReceivedTime
+                );
 
-            setTranscriptions(sortedTranscriptions);
-        },
-        [transcriptionMap, setTranscriptions]
-    );
-
-    const addTranscription = useCallback(
-        (identity: string, message: string) => {
-            const now = Date.now();
-            const newTranscription: Transcription = {
-                identity,
-                segment: {
-                    id: crypto.randomUUID(),
-                    text: message,
-                    language: '',
-                    startTime: now,
-                    endTime: now,
-                    final: true,
-                    firstReceivedTime: now,
-                    lastReceivedTime: now,
-                },
-            };
-            mergeTranscriptions([newTranscription]);
-
-            // Send message to agent
-            if (agentIdentity) {
-                room.localParticipant.sendText(message, {
-                    topic: 'lk.chat',
-                    destinationIdentities: [agentIdentity],
-                });
-            }
-        },
-        [mergeTranscriptions, agentIdentity, room]
-    );
-
-    useEffect(() => {
-        room.registerTextStreamHandler(
-            'lk.transcription',
-            (reader: any, participantInfo: { identity: string }) => {
-                const segment = createTranscriptionSegment(reader.info.attributes);
-                let text = '';
-
-                const readFunc = async () => {
-                    for await (const chunk of reader) {
-                        text += chunk;
-                        const updatedSegment = { ...segment, text, lastReceivedTime: Date.now() };
-                        mergeTranscriptions([{ identity: participantInfo.identity, segment: updatedSegment }]);
-                    }
-                    const finalSegment = { ...segment, text, final: true };
-                    mergeTranscriptions([{ identity: participantInfo.identity, segment: finalSegment }]);
-                };
-
-                readFunc();
-            }
+                setTranscriptions(sortedTranscriptions);
+            },
+            [transcriptionMap, setTranscriptions]
         );
 
-        return () => {
-            room.unregisterTextStreamHandler('lk.transcription');
-        };
-    }, [room]);
+        const addTranscription = useCallback(
+            (identity: string, message: string) => {
+                try {
+                    const now = Date.now();
+                    // Use a fallback for crypto.randomUUID if not available
+                    const generateId = () => {
+                        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                            return crypto.randomUUID();
+                        }
+                        // Fallback UUID generation
+                        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                            const r = Math.random() * 16 | 0;
+                            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                            return v.toString(16);
+                        });
+                    };
 
-    return { transcriptions, addTranscription };
+                    const newTranscription: Transcription = {
+                        identity,
+                        segment: {
+                            id: generateId(),
+                            text: message,
+                            language: '',
+                            startTime: now,
+                            endTime: now,
+                            final: true,
+                            firstReceivedTime: now,
+                            lastReceivedTime: now,
+                        },
+                    };
+                    mergeTranscriptions([newTranscription]);
+
+                    // Send message to agent
+                    if (agentIdentity && room?.localParticipant) {
+                        room.localParticipant.sendText(message, {
+                            topic: 'lk.chat',
+                            destinationIdentities: [agentIdentity],
+                        });
+                    }
+                } catch (error) {
+                    console.error('[Transcription] Error adding transcription:', error);
+                }
+            },
+            [mergeTranscriptions, agentIdentity, room]
+        );
+
+        useEffect(() => {
+            if (!room) {
+                console.warn('[Transcription] Room not available');
+                return;
+            }
+
+            try {
+                room.registerTextStreamHandler(
+                    'lk.transcription',
+                    (reader: any, participantInfo: { identity: string }) => {
+                        const segment = createTranscriptionSegment(reader.info.attributes);
+                        let text = '';
+
+                        const readFunc = async () => {
+                            try {
+                                for await (const chunk of reader) {
+                                    text += chunk;
+                                    const updatedSegment = { ...segment, text, lastReceivedTime: Date.now() };
+                                    mergeTranscriptions([{ identity: participantInfo.identity, segment: updatedSegment }]);
+                                }
+                                const finalSegment = { ...segment, text, final: true };
+                                mergeTranscriptions([{ identity: participantInfo.identity, segment: finalSegment }]);
+                            } catch (error) {
+                                console.error('[Transcription] Error reading stream:', error);
+                            }
+                        };
+
+                        readFunc();
+                    }
+                );
+
+                return () => {
+                    try {
+                        room.unregisterTextStreamHandler('lk.transcription');
+                    } catch (error) {
+                        console.error('[Transcription] Error unregistering handler:', error);
+                    }
+                };
+            } catch (error) {
+                console.error('[Transcription] Error registering text stream handler:', error);
+            }
+        }, [room, mergeTranscriptions]);
+
+        return { transcriptions, addTranscription };
+    } catch (error) {
+        console.error('[Transcription] Error in native implementation:', error);
+        // Fallback to web stub if native fails
+        return useDataStreamTranscriptionsWeb();
+    }
 }
 
 // ─── Export ───────────────────────────────────────────────────────────────────

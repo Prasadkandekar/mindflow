@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   SafeAreaView,
   Text,
   TextInput,
@@ -19,20 +20,29 @@ export default function VoiceCompanionScreen() {
   const startSession = async () => {
     try {
       setIsConnecting(true);
+      console.log('[Companion] Fetching token...');
       const details = await fetchToken();
+      console.log('[Companion] Token fetched:', !!details?.token);
       setIsConnecting(false);
 
-      if (details?.token) {
+      if (details?.token && details?.url) {
+        console.log('[Companion] Navigating to active-session with token');
+        // Use replace instead of push to avoid back navigation issues
         router.push({
-          pathname: '/companion/active-session',
-          params: { token: details.token, url: details.url },
+          pathname: '/(tabs)/companion/active-session',
+          params: { 
+            token: details.token, 
+            url: details.url 
+          },
         });
       } else {
-        console.error('Could not fetch LiveKit token');
+        console.error('[Companion] Could not fetch LiveKit token or URL');
+        Alert.alert('Connection Failed', 'Failed to connect. Please check your internet connection and try again.');
       }
     } catch (error) {
       setIsConnecting(false);
-      console.error('Connection error:', error);
+      console.error('[Companion] Connection error:', error);
+      Alert.alert('Connection Error', error instanceof Error ? error.message : 'Unknown error occurred');
     }
   };
 

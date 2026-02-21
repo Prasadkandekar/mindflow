@@ -54,12 +54,14 @@ export default function TabsLayout() {
         }}
       />
 
-      <Tabs.Screen
-        name="companion"
+  
+
+       <Tabs.Screen
+        name="chat"
         options={{
-          title: "Companion",
+          title: "Chat",
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "mic" : "mic-outline"} size={size} color={color} />
+            <Ionicons name={focused ? "chatbubbles" : "chatbubbles-outline"} size={size} color={color} />
           ),
         }}
       />

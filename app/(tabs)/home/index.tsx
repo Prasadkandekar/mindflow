@@ -512,7 +512,7 @@ export default function HomeDashboard() {
                         </View>
                         <View className="flex-row">
                             <QuickAction icon="leaf" title="Wellness" onPress={() => router.push('/home/wellness-preview')} color="bg-mood-neutral" />
-                            <QuickAction icon="mic" title="Talk to AI" onPress={() => router.push('/companion')} color="bg-primary" />
+                            <QuickAction icon="mic" title="Talk to AI" onPress={() => router.push('/chat')} color="bg-primary" />
                             <QuickAction icon="settings" title="Profile" onPress={() => router.push('/home/profile')} color="bg-textSecondary" />
                         </View>
                     </View>

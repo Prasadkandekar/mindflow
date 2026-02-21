@@ -71,18 +71,18 @@ export default function WellnessHubScreen() {
   const [loading, setLoading] = React.useState(true);
   const [wellbeingScore, setWellbeingScore] = React.useState<number | null>(null);
   const [report, setReport] = React.useState<any>(null);
+  const [showDetailedReport, setShowDetailedReport] = React.useState(false);
+  const [profile, setProfile] = React.useState<any>(null);
 
   const fetchData = React.useCallback(async () => {
     try {
-      const { data } = await supabase
-        .from('wellbeing_scores')
-        .select('composite_score')
-        .eq('user_id', ACTOR_ID)
-        .order('calculated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const [scoreRes, profileRes] = await Promise.all([
+        supabase.from('wellbeing_scores').select('composite_score').eq('user_id', ACTOR_ID).order('calculated_at', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('profiles').select('full_name').eq('id', ACTOR_ID).maybeSingle()
+      ]);
 
-      if (data) setWellbeingScore(Number(data.composite_score));
+      if (scoreRes.data) setWellbeingScore(Number(scoreRes.data.composite_score));
+      if (profileRes.data) setProfile(profileRes.data);
 
       const reportData = await generateWeeklyReport(ACTOR_ID);
       setReport(reportData);
@@ -221,51 +221,249 @@ export default function WellnessHubScreen() {
             <View className="bg-white p-8 rounded-[48px] shadow-card border border-primary/10">
               <View className="flex-row justify-between items-center mb-6">
                 <View>
-                  <Text className="text-textPrimary text-2xl font-bold">Mental Insight</Text>
-                  <Text className="text-textSecondary text-xs">Weekly Clinical Estimate</Text>
+                  <Text className="text-textPrimary text-2xl font-bold">Health Synthesis</Text>
+                  <Text className="text-textSecondary text-xs">Based on clinical observations</Text>
                 </View>
-                <View className={`px-4 py-2 rounded-2xl ${report.riskLevel.level === 'Low' ? 'bg-green-50' : 'bg-red-50'}`}>
-                  <Text className={`font-bold text-xs ${report.riskLevel.level === 'Low' ? 'text-green-600' : 'text-red-600'}`}>
-                    {report.riskLevel.color} {report.riskLevel.level} RISK
-                  </Text>
+                <TouchableOpacity
+                  onPress={() => setShowDetailedReport(true)}
+                  className="bg-primary/10 px-4 py-2 rounded-2xl flex-row items-center"
+                >
+                  <Ionicons name="document-text" size={14} color="#FF7B1B" className="mr-2" />
+                  <Text className="text-primary font-bold text-xs ml-1">Full Report</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View className="bg-background/40 p-6 rounded-[32px] border border-secondary/10 mb-6">
+                <View className="flex-row justify-between items-center mb-4">
+                  <Text className="text-textPrimary font-bold">Assessment Summary</Text>
+                  <View className={`px-3 py-1 rounded-full ${report.riskLevel.level === 'Low' ? 'bg-green-100' : 'bg-red-100'}`}>
+                    <Text className={`text-[10px] font-bold ${report.riskLevel.level === 'Low' ? 'text-green-700' : 'text-red-700'}`}>
+                      {report.riskLevel.level.toUpperCase()} RISK
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="flex-row items-center">
+                  <View className="flex-1">
+                    <Text className="text-textSecondary text-[10px] font-bold uppercase mb-1">Composite Score</Text>
+                    <Text className="text-textPrimary text-3xl font-bold">{report.weeklyAverages.composite}%</Text>
+                  </View>
+                  <View className="h-10 w-[1px] bg-secondary/20 mx-4" />
+                  <View className="flex-1">
+                    <Text className="text-textSecondary text-[10px] font-bold uppercase mb-1">Clinical Trend</Text>
+                    <Text className={`text-xl font-bold ${report.trends.overall === 'Improving' ? 'text-green-600' : 'text-textPrimary'}`}>
+                      {report.trends.arrow} {report.trends.overall}
+                    </Text>
+                  </View>
                 </View>
               </View>
 
-              <View className="flex-row gap-4 mb-8">
+              <View className="flex-row gap-4 mb-6">
                 <View className="flex-1 bg-blue-50/50 p-5 rounded-[32px] border border-blue-100">
-                  <Text className="text-blue-600 font-bold text-[10px] uppercase tracking-wider mb-1">PHQ-9 (Mood)</Text>
-                  <View className="flex-row items-baseline">
-                    <Text className="text-textPrimary text-2xl font-bold">{report.clinical.phq9}</Text>
-                    <Text className="text-textSecondary text-[10px] ml-1">/27</Text>
-                  </View>
-                  <Text className="text-blue-500 text-[10px] font-bold mt-1">{report.clinical.phq9Severity}</Text>
+                  <Text className="text-blue-600 font-bold text-[10px] uppercase mb-1">Mood (PHQ-9)</Text>
+                  <Text className="text-textPrimary text-xl font-bold">{report.clinical.phq9}/27</Text>
+                  <Text className="text-blue-500 text-[10px] font-bold">{report.clinical.phq9Severity}</Text>
                 </View>
                 <View className="flex-1 bg-purple-50/50 p-5 rounded-[32px] border border-purple-100">
-                  <Text className="text-purple-600 font-bold text-[10px] uppercase tracking-wider mb-1">GAD-7 (Anxiety)</Text>
-                  <View className="flex-row items-baseline">
-                    <Text className="text-textPrimary text-2xl font-bold">{report.clinical.gad7}</Text>
-                    <Text className="text-textSecondary text-[10px] ml-1">/21</Text>
-                  </View>
-                  <Text className="text-purple-500 text-[10px] font-bold mt-1">{report.clinical.gad7Severity}</Text>
+                  <Text className="text-purple-600 font-bold text-[10px] uppercase mb-1">Anxiety (GAD-7)</Text>
+                  <Text className="text-textPrimary text-xl font-bold">{report.clinical.gad7}/21</Text>
+                  <Text className="text-purple-500 text-[10px] font-bold">{report.clinical.gad7Severity}</Text>
                 </View>
               </View>
 
-              <View className="bg-background/50 p-5 rounded-[32px] border border-secondary/10">
-                <Text className="text-textPrimary font-bold text-sm mb-3">AI Recommendations</Text>
-                {report.recommendations.map((rec: string, idx: number) => (
-                  <View key={idx} className="flex-row mb-3 last:mb-0">
+              <View className="bg-primary/5 p-5 rounded-[32px] border border-primary/10">
+                <View className="flex-row items-center mb-3">
+                  <Ionicons name="bulb" size={16} color="#FF7B1B" />
+                  <Text className="text-textPrimary font-bold text-sm ml-2">Clinical Protocol</Text>
+                </View>
+                {report.recommendations.slice(0, 2).map((rec: string, idx: number) => (
+                  <View key={idx} className="flex-row mb-2">
                     <Text className="text-primary mr-2">•</Text>
-                    <Text className="text-textSecondary text-xs leading-relaxed flex-1">{rec}</Text>
+                    <Text className="text-textSecondary text-[11px] leading-tight flex-1">{rec}</Text>
                   </View>
                 ))}
               </View>
-
-              <View className="flex-row items-center justify-center mt-6">
-                <Text className="text-textSecondary text-[10px] font-medium italic">
-                  Trend: {report.trends.arrow} {report.trends.overall}
-                </Text>
-              </View>
             </View>
+          </View>
+        )}
+
+        {/* Detailed Medical Report Modal */}
+        {report && (
+          <View>
+            {showDetailedReport && (
+              <View
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000, backgroundColor: 'white' }}
+                className="flex-1"
+              >
+                <SafeAreaView className="flex-1">
+                  <View className="px-6 py-4 flex-row justify-between items-center border-b border-background">
+                    <Text className="text-textPrimary font-bold text-lg">Medical Report</Text>
+                    <TouchableOpacity
+                      onPress={() => setShowDetailedReport(false)}
+                      className="w-10 h-10 rounded-full bg-background items-center justify-center"
+                    >
+                      <Ionicons name="close" size={24} color="#2D1E17" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView className="flex-1 bg-white" showsVerticalScrollIndicator={false}>
+                    <View className="p-8">
+                      {/* Logo and Institution Placeholder */}
+                      <View className="flex-row justify-between items-start mb-10">
+                        <View>
+                          <Text className="text-primary font-black text-3xl">MOON<Text className="text-textPrimary">DIARY</Text></Text>
+                          <Text className="text-textSecondary text-[10px] font-bold uppercase tracking-[2px]">Mental Health Assessment Lab</Text>
+                        </View>
+                        <View className="items-end">
+                          <Text className="text-textPrimary font-bold text-xs">Report ID: {Math.random().toString(36).substring(7).toUpperCase()}</Text>
+                          <Text className="text-textSecondary text-[10px]">{new Date().toLocaleDateString()}</Text>
+                        </View>
+                      </View>
+
+                      {/* Header Section */}
+                      <View className="bg-textPrimary p-6 rounded-3xl mb-8">
+                        <Text className="text-white text-xl font-bold mb-1">Psychological Status Report</Text>
+                        <Text className="text-white/60 text-xs mb-4">Patient Assessment Summary (Weekly View)</Text>
+                        <View className="flex-row">
+                          <View className="flex-1">
+                            <Text className="text-white/40 text-[9px] uppercase font-bold">Patient Name</Text>
+                            <Text className="text-white font-medium">{profile?.full_name || 'Pravin'}</Text>
+                          </View>
+                          <View className="flex-1 border-l border-white/10 pl-4">
+                            <Text className="text-white/40 text-[9px] uppercase font-bold">Assessment Period</Text>
+                            <Text className="text-white font-medium">{report.reportPeriod.from} – {report.reportPeriod.to}</Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Summary Grid */}
+                      <View className="mb-10">
+                        <Text className="text-textPrimary font-bold text-sm uppercase tracking-wider mb-4 border-b border-background pb-2">Clinical Summary</Text>
+                        <View className="flex-row gap-4 mb-4">
+                          <View className="flex-1 bg-background p-5 rounded-3xl items-center">
+                            <Text className="text-textSecondary text-[9px] font-bold uppercase mb-1">Composite</Text>
+                            <Text className="text-textPrimary text-3xl font-bold">{report.weeklyAverages.composite}%</Text>
+                          </View>
+                          <View className="flex-1 bg-background p-5 rounded-3xl items-center">
+                            <Text className="text-textSecondary text-[9px] font-bold uppercase mb-1">Risk Status</Text>
+                            <Text className={`text-xl font-bold ${report.riskLevel.level === 'Low' ? 'text-green-600' : 'text-red-600'}`}>
+                              {report.riskLevel.level.toUpperCase()}
+                            </Text>
+                          </View>
+                          <View className="flex-1 bg-background p-5 rounded-3xl items-center">
+                            <Text className="text-textSecondary text-[9px] font-bold uppercase mb-1">Trend</Text>
+                            <Text className="text-textPrimary text-xl font-bold">{report.trends.arrow} {report.trends.overall}</Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Clinical Scales */}
+                      <View className="mb-10">
+                        <Text className="text-textPrimary font-bold text-sm uppercase tracking-wider mb-4 border-b border-background pb-2">Clinical Scales (Estimations)</Text>
+
+                        <View className="mb-6">
+                          <View className="flex-row justify-between mb-2">
+                            <Text className="text-textPrimary font-bold">PHQ-9 (Depression Inventory)</Text>
+                            <Text className="text-textPrimary font-bold">{report.clinical.phq9}/27</Text>
+                          </View>
+                          <View className="h-2 bg-background rounded-full overflow-hidden">
+                            <View
+                              className={`h-full ${report.clinical.phq9 <= 9 ? 'bg-green-500' : report.clinical.phq9 <= 14 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                              style={{ width: `${(report.clinical.phq9 / 27) * 100}%` }}
+                            />
+                          </View>
+                          <Text className="text-textSecondary text-[10px] mt-2 italic">Interpretation: {report.clinical.phq9Severity} symptoms</Text>
+                        </View>
+
+                        <View>
+                          <View className="flex-row justify-between mb-2">
+                            <Text className="text-textPrimary font-bold">GAD-7 (Anxiety Inventory)</Text>
+                            <Text className="text-textPrimary font-bold">{report.clinical.gad7}/21</Text>
+                          </View>
+                          <View className="h-2 bg-background rounded-full overflow-hidden">
+                            <View
+                              className={`h-full ${report.clinical.gad7 <= 9 ? 'bg-green-500' : report.clinical.gad7 <= 14 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                              style={{ width: `${(report.clinical.gad7 / 21) * 100}%` }}
+                            />
+                          </View>
+                          <Text className="text-textSecondary text-[10px] mt-2 italic">Interpretation: {report.clinical.gad7Severity} symptoms</Text>
+                        </View>
+                      </View>
+
+                      {/* Performance Table */}
+                      <View className="mb-10">
+                        <Text className="text-textPrimary font-bold text-sm uppercase tracking-wider mb-4 border-b border-background pb-2">Weekly Performance metrics</Text>
+                        <View className="bg-background/20 rounded-3xl overflow-hidden border border-background">
+                          <View className="flex-row bg-background/50 p-4 border-b border-background">
+                            <Text className="flex-1 text-textSecondary font-bold text-[10px] uppercase">Metric</Text>
+                            <Text className="w-20 text-textSecondary font-bold text-[10px] uppercase text-right">Avg Score</Text>
+                            <Text className="w-20 text-textSecondary font-bold text-[10px] uppercase text-right">Status</Text>
+                          </View>
+                          {[
+                            { label: 'Mood Balance', val: report.weeklyAverages.mood, unit: '/10' },
+                            { label: 'Stress Resilience', val: report.weeklyAverages.stress, unit: '/10' },
+                            { label: 'Sleep Hygiene', val: report.weeklyAverages.sleep, unit: 'h' },
+                            { label: 'Emotional Tone', val: report.weeklyAverages.sentiment, unit: '%' }
+                          ].map((item, i) => (
+                            <View key={i} className="flex-row p-4 border-b border-background">
+                              <Text className="flex-1 text-textPrimary font-medium text-xs">{item.label}</Text>
+                              <Text className="w-20 text-textPrimary font-bold text-xs text-right">{item.val}{item.unit}</Text>
+                              <Text className={`w-20 font-bold text-[10px] text-right ${Number(item.val) > 7 || item.label === 'Sleep Hygiene' && Number(item.val) > 7 ? 'text-green-600' : 'text-orange-500'}`}>
+                                {Number(item.val) > 7 || item.label === 'Sleep Hygiene' && Number(item.val) > 7 ? 'OPTIMAL' : 'MONITOR'}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+
+                      {/* Recommendations */}
+                      <View className="mb-10">
+                        <Text className="text-textPrimary font-bold text-sm uppercase tracking-wider mb-4 border-b border-background pb-2">Professional Recommendations</Text>
+                        <View className="bg-primary/5 p-6 rounded-3xl border border-primary/20">
+                          {report.recommendations.map((rec: string, idx: number) => (
+                            <View key={idx} className="flex-row mb-4 last:mb-0">
+                              <View className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 mr-3" />
+                              <Text className="text-textPrimary text-xs leading-relaxed flex-1">{rec}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+
+                      {/* Daily Log */}
+                      <View className="mb-20">
+                        <Text className="text-textPrimary font-bold text-sm uppercase tracking-wider mb-4 border-b border-background pb-2">Daily Monitoring dataset</Text>
+                        <View className="bg-background/10 rounded-3xl overflow-hidden border border-background">
+                          <View className="flex-row bg-background/30 p-4 border-b border-background">
+                            <Text className="w-24 text-textSecondary font-bold text-[9px] uppercase">Date</Text>
+                            <Text className="flex-1 text-textSecondary font-bold text-[9px] uppercase text-center">Mood</Text>
+                            <Text className="flex-1 text-textSecondary font-bold text-[9px] uppercase text-center">Stress</Text>
+                            <Text className="flex-1 text-textSecondary font-bold text-[9px] uppercase text-center">Sleep</Text>
+                            <Text className="w-12 text-textSecondary font-bold text-[9px] uppercase text-right">Risk</Text>
+                          </View>
+                          {report.dailyScores.map((day: any, i: number) => (
+                            <View key={i} className="flex-row p-4 border-b border-background last:border-0">
+                              <Text className="w-24 text-textPrimary font-medium text-[10px]">{day.date}</Text>
+                              <Text className="flex-1 text-textPrimary text-[10px] text-center">{day.mood ?? '--'}</Text>
+                              <Text className="flex-1 text-textPrimary text-[10px] text-center">{day.stress ?? '--'}</Text>
+                              <Text className="flex-1 text-textPrimary text-[10px] text-center">{day.sleep ?? '--'}</Text>
+                              <View className="w-12 items-end">
+                                <View className={`w-3 h-3 rounded-full ${day.risk === 'low' ? 'bg-green-500' : day.risk === 'medium' ? 'bg-yellow-500' : 'bg-red-500'}`} />
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+
+                      {/* Footer */}
+                      <View className="items-center pb-10 border-t border-background pt-8">
+                        <Text className="text-textSecondary text-[10px] text-center mb-1">THIS IS AN AI-GENERATED ESTIMATION AND SHOULD NOT BE USED AS A DEFINITIVE MEDICAL DIAGNOSIS.</Text>
+                        <Text className="text-textSecondary text-[10px] text-center italic">MoonDiary Labs Assessment Protocol v1.4.2</Text>
+                      </View>
+                    </View>
+                  </ScrollView>
+                </SafeAreaView>
+              </View>
+            )}
           </View>
         )}
 

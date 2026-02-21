@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../services/supabase';
 
 const ACTOR_ID = '6ceaaeea-91f5-427d-bb4e-d651e2a2fd61';
@@ -28,14 +29,20 @@ export default function TrackerDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const [weeklyAvg, setWeeklyAvg] = useState({ mood: 0, sleep: 0, stress: 0, wellness: 0 });
+
   const fetchTodayData = useCallback(async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
+      const lastWeek = new Date();
+      lastWeek.setDate(lastWeek.getDate() - 7);
+      const lastWeekStr = lastWeek.toISOString().split('T')[0];
 
-      const [moodRes, sleepRes, stressRes] = await Promise.all([
+      const [moodRes, sleepRes, stressRes, weeklyRes] = await Promise.all([
         supabase.from('mood_logs').select('mood_score').eq('user_id', ACTOR_ID).eq('entry_date', today).maybeSingle(),
         supabase.from('sleep_logs').select('sleep_hours, sleep_quality').eq('user_id', ACTOR_ID).eq('entry_date', today).maybeSingle(),
         supabase.from('stress_logs').select('stress_level, trigger').eq('user_id', ACTOR_ID).eq('entry_date', today).maybeSingle(),
+        supabase.from('wellbeing_scores').select('mood_avg, stress_avg, sleep_avg, composite_score').eq('user_id', ACTOR_ID).gte('calculated_at', lastWeekStr),
       ]);
 
       setTodayData({
@@ -45,6 +52,23 @@ export default function TrackerDashboard() {
         stressLevel: stressRes.data?.stress_level ?? null,
         stressTrigger: stressRes.data?.trigger ?? null,
       });
+
+      if (weeklyRes.data && weeklyRes.data.length > 0) {
+        const count = weeklyRes.data.length;
+        const sums = weeklyRes.data.reduce((acc, curr) => ({
+          mood: acc.mood + (curr.mood_avg || 0),
+          stress: acc.stress + (curr.stress_avg || 0),
+          sleep: acc.sleep + (curr.sleep_avg || 0),
+          wellness: acc.wellness + (curr.composite_score || 0)
+        }), { mood: 0, stress: 0, sleep: 0, wellness: 0 });
+
+        setWeeklyAvg({
+          mood: Math.round(sums.mood / count),
+          stress: Math.round(sums.stress / count),
+          sleep: Math.round(sums.sleep / count),
+          wellness: Math.round(sums.wellness / count)
+        });
+      }
     } catch (error) {
       console.error('Error fetching today data:', error);
     } finally {
@@ -235,29 +259,49 @@ export default function TrackerDashboard() {
           </TouchableOpacity>
         </View>
 
-        {/* Bar Chart — now data-driven */}
+        {/* Bar Chart — Weekly Analytics */}
         <View className="bg-white p-6 rounded-[40px] shadow-card mb-8">
           <View className="flex-row justify-between items-center mb-6">
-            <Text className="text-textPrimary text-xl font-bold">Your statistic</Text>
+            <View>
+              <Text className="text-textPrimary text-xl font-bold">Weekly Analytics</Text>
+              <Text className="text-textSecondary text-[10px] font-bold uppercase tracking-wider mt-1">Today vs Weekly Avg</Text>
+            </View>
             <TouchableOpacity>
-              <Ionicons name="ellipsis-horizontal" size={20} color="#8E7E77" />
+              <Ionicons name="stats-chart" size={20} color="#FF7B1B" />
             </TouchableOpacity>
           </View>
 
           <View className="flex-row items-end justify-between px-2 h-48">
             {[
-              { label: 'Mood', value: todayData.mood ? todayData.mood * 10 : 0, color: 'bg-primary' },
-              { label: 'Sleep', value: todayData.sleepQuality ? todayData.sleepQuality * 10 : 0, color: 'bg-accent' },
-              { label: 'Stress', value: todayData.stressLevel ? todayData.stressLevel * 10 : 0, color: 'bg-mood-stressed' },
-              { label: 'Wellness', value: wellness ?? 0, color: 'bg-mood-calm' },
+              { label: 'Mood', today: todayData.mood ? todayData.mood * 10 : 0, avg: weeklyAvg.mood * 10, color: 'bg-primary' },
+              { label: 'Sleep', today: todayData.sleepQuality ? todayData.sleepQuality * 10 : 0, avg: weeklyAvg.sleep * 10, color: 'bg-accent' },
+              { label: 'Stress', today: todayData.stressLevel ? todayData.stressLevel * 10 : 0, avg: weeklyAvg.stress * 10, color: 'bg-mood-stressed' },
+              { label: 'Well', today: wellness ?? 0, avg: weeklyAvg.wellness, color: 'bg-mood-calm' },
             ].map((item, idx) => (
-              <View key={idx} className="items-center">
-                <View className="w-4 bg-background h-36 rounded-full overflow-hidden justify-end">
-                  <View className={`${item.color} rounded-full`} style={{ height: `${item.value}%` }} />
+              <View key={idx} className="items-center flex-1">
+                <View className="flex-row items-end justify-center w-full gap-1">
+                  {/* Weekly Avg Bar (Slimmer/Lighter) */}
+                  <View className="w-1.5 bg-background h-32 rounded-full overflow-hidden justify-end">
+                    <View className={`${item.color} opacity-30 rounded-full`} style={{ height: `${item.avg}%` }} />
+                  </View>
+                  {/* Today Bar */}
+                  <View className="w-3 bg-background h-36 rounded-full overflow-hidden justify-end">
+                    <View className={`${item.color} rounded-full`} style={{ height: `${item.today}%` }} />
+                  </View>
                 </View>
                 <Text className="text-[10px] font-bold text-textSecondary mt-3">{item.label}</Text>
               </View>
             ))}
+          </View>
+          <View className="flex-row justify-center mt-6 gap-6">
+            <View className="flex-row items-center">
+              <View className="w-2 h-2 rounded-full bg-textSecondary opacity-30 mr-2" />
+              <Text className="text-[10px] font-bold text-textSecondary uppercase">Weekly Avg</Text>
+            </View>
+            <View className="flex-row items-center">
+              <View className="w-2 h-2 rounded-full bg-primary mr-2" />
+              <Text className="text-[10px] font-bold text-textSecondary uppercase">Today</Text>
+            </View>
           </View>
         </View>
 

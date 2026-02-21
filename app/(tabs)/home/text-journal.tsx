@@ -27,16 +27,16 @@ export default function TextJournalScreen() {
         try {
             const today = new Date().toISOString().split('T')[0];
 
-            // 1. Upsert journal to Supabase (Overwrite if today's entry exists)
+            // 1. Insert journal to Supabase (allows multiple entries per day)
             const { data: journalData, error: journalError } = await supabase
                 .from('journals')
-                .upsert([
+                .insert([
                     {
                         user_id: ACTOR_ID,
                         content: text,
                         entry_date: today,
                     }
-                ], { onConflict: 'user_id,entry_date' })
+                ])
                 .select()
                 .single();
 

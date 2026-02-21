@@ -108,17 +108,25 @@ export default function HomeDashboard() {
     const [riskLevel, setRiskLevel] = useState<string>('low');
     const [aiInsight, setAiInsight] = useState("Loading insights...");
 
+    const [weeklyAvg, setWeeklyAvg] = useState({ mood: 0, sleep: 0, stress: 0, wellness: 0 });
+    const [recentSentiment, setRecentSentiment] = useState<string | null>(null);
+
     const fetchData = useCallback(async () => {
         try {
             const today = new Date().toISOString().split('T')[0];
+            const lastWeek = new Date();
+            lastWeek.setDate(lastWeek.getDate() - 7);
+            const lastWeekStr = lastWeek.toISOString();
 
-            const [sleepRes, stressRes, moodRes, scoreRes, profileRes, logsRes] = await Promise.all([
+            const [sleepRes, stressRes, moodRes, scoreRes, profileRes, logsRes, weeklyRes, journalRes] = await Promise.all([
                 supabase.from('sleep_logs').select('sleep_hours, sleep_quality').eq('user_id', ACTOR_ID).eq('entry_date', today).maybeSingle(),
                 supabase.from('stress_logs').select('stress_level, trigger').eq('user_id', ACTOR_ID).eq('entry_date', today).maybeSingle(),
                 supabase.from('mood_logs').select('mood_score').eq('user_id', ACTOR_ID).eq('entry_date', today).maybeSingle(),
-                supabase.from('wellbeing_scores').select('composite_score').eq('user_id', ACTOR_ID).order('calculated_at', { ascending: false }).limit(1).maybeSingle(),
+                supabase.from('wellbeing_scores').select('composite_score, risk_level').eq('user_id', ACTOR_ID).order('calculated_at', { ascending: false }).limit(1).maybeSingle(),
                 supabase.from('profiles').select('full_name').eq('id', ACTOR_ID).maybeSingle(),
                 supabase.from('mood_logs').select('entry_date').eq('user_id', ACTOR_ID).order('entry_date', { ascending: false }),
+                supabase.from('wellbeing_scores').select('mood_avg, stress_avg, sleep_avg, composite_score').eq('user_id', ACTOR_ID).gte('calculated_at', lastWeekStr),
+                supabase.from('journals').select('id, content, sentiment_analysis(emotion_label)').eq('user_id', ACTOR_ID).order('created_at', { ascending: false }).limit(3)
             ]);
 
             if (profileRes.data?.full_name) {
@@ -151,6 +159,30 @@ export default function HomeDashboard() {
                 setStreak(currentStreak);
             }
 
+            // Calculate Weekly Averages
+            if (weeklyRes.data && weeklyRes.data.length > 0) {
+                const count = weeklyRes.data.length;
+                const sums = weeklyRes.data.reduce((acc, curr) => ({
+                    mood: acc.mood + (curr.mood_avg || 0),
+                    stress: acc.stress + (curr.stress_avg || 0),
+                    sleep: acc.sleep + (curr.sleep_avg || 0),
+                    wellness: acc.wellness + (curr.composite_score || 0)
+                }), { mood: 0, stress: 0, sleep: 0, wellness: 0 });
+
+                setWeeklyAvg({
+                    mood: Math.round(sums.mood / count),
+                    stress: Math.round(sums.stress / count),
+                    sleep: Math.round(sums.sleep / count),
+                    wellness: Math.round(sums.wellness / count)
+                });
+            }
+
+            if (journalRes.data && journalRes.data.length > 0) {
+                // @ts-ignore - sentiment_analysis is a join
+                const sentiments = journalRes.data.map(j => j.sentiment_analysis?.[0]?.emotion_label || j.sentiment_analysis?.emotion_label).filter(Boolean);
+                if (sentiments.length > 0) setRecentSentiment(sentiments[0]);
+            }
+
             const currentSleep = sleepRes.data ? Number(sleepRes.data.sleep_hours) : 7;
             const currentStress = stressRes.data ? Number(stressRes.data.stress_level) : 3;
             const currentMood = moodRes.data ? Number(moodRes.data.mood_score) : null;
@@ -175,12 +207,16 @@ export default function HomeDashboard() {
 
             setWellbeingScore(isNaN(computed) ? 84 : computed);
 
-            // Generate a simple AI insight based on data
+            // Generate Dynamic AI insight based on weekly and sentiment data
             let insight = "Track your day to get personalized AI insights and improve your wellbeing.";
             if (currentStress > 7) {
-                insight = "Your stress levels are quite high. Consider a short meditation or a walk in nature.";
+                insight = "Your stress levels are quite high today. Consider a short meditation or a walk in nature.";
+            } else if (recentSentiment === 'sad' || recentSentiment === 'anxious') {
+                insight = `We noticed you've been feeling slightly ${recentSentiment} in your journals. Taking a moment for self-care can help.`;
             } else if (currentSleep < 6) {
                 insight = "You might feel a bit tired today. Try to wind down 30 minutes earlier tonight.";
+            } else if (weeklyAvg.wellness > 80) {
+                insight = "You've had a great week! Your consistency in maintaining high wellbeing is impressive. ✨";
             } else if (computed > 80) {
                 insight = "You're doing amazing! Your consistency is paying off. Keep it up! ✨";
             } else if (computed < 50) {
@@ -193,7 +229,7 @@ export default function HomeDashboard() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [weeklyAvg.wellness, recentSentiment]);
 
     useEffect(() => {
         fetchData();
@@ -354,21 +390,21 @@ export default function HomeDashboard() {
                 </View>
 
                 <View className="px-6 py-8">
-                    {/* Daily Summary */}
+                    {/* Daily & Weekly Summary */}
                     <View className="mb-8">
                         <View className="flex-row justify-between items-center mb-4">
-                            <Text className="text-textPrimary text-xl font-bold">Daily Summary</Text>
-                            <TouchableOpacity>
-                                <Text className="text-primary font-bold text-sm">See all</Text>
+                            <Text className="text-textPrimary text-xl font-bold">Summary & Analytics</Text>
+                            <TouchableOpacity onPress={() => router.push('/tracker')}>
+                                <Text className="text-primary font-bold text-sm">Full Stats</Text>
                             </TouchableOpacity>
                         </View>
-                        <View className="flex-row gap-3">
+                        <View className="flex-row gap-3 mb-3">
                             <View className="bg-secondary/20 p-5 rounded-[32px] flex-1 border border-secondary/30">
                                 <View className="w-10 h-10 rounded-2xl bg-white items-center justify-center mb-3">
                                     <Ionicons name="moon" size={20} color="#FF7B1B" />
                                 </View>
                                 <Text className="text-textPrimary text-xl font-bold">{sleepHours}h</Text>
-                                <Text className="text-textSecondary text-[10px] font-bold uppercase tracking-wider">Sleep Duration</Text>
+                                <Text className="text-textSecondary text-[10px] font-bold uppercase tracking-wider">Today's Sleep</Text>
                             </View>
                             <View className="bg-mood-neutral/20 p-5 rounded-[32px] flex-1 border border-mood-neutral/30">
                                 <View className="w-10 h-10 rounded-2xl bg-white items-center justify-center mb-3">
@@ -376,6 +412,29 @@ export default function HomeDashboard() {
                                 </View>
                                 <Text className="text-textPrimary text-xl font-bold">{streak} Days</Text>
                                 <Text className="text-textSecondary text-[10px] font-bold uppercase tracking-wider">Current Streak</Text>
+                            </View>
+                        </View>
+                        <View className="flex-row gap-3">
+                            <View className="bg-primary/10 p-5 rounded-[32px] flex-1 border border-primary/20">
+                                <View className="flex-row justify-between items-start mb-2">
+                                    <Text className="text-textPrimary text-lg font-bold">{weeklyAvg.wellness}%</Text>
+                                    <Ionicons name="trending-up" size={16} color="#FF7B1B" />
+                                </View>
+                                <Text className="text-textSecondary text-[10px] font-bold uppercase tracking-wider">Weekly Wellness</Text>
+                            </View>
+                            <View className="bg-accent/10 p-5 rounded-[32px] flex-1 border border-accent/20">
+                                <View className="flex-row justify-between items-start mb-2">
+                                    <Text className="text-textPrimary text-lg font-bold">{weeklyAvg.mood}/10</Text>
+                                    <Ionicons name="happy-outline" size={16} color="#8B5CF6" />
+                                </View>
+                                <Text className="text-textSecondary text-[10px] font-bold uppercase tracking-wider">Avg Mood</Text>
+                            </View>
+                            <View className="bg-mood-stressed/10 p-5 rounded-[32px] flex-1 border border-mood-stressed/20">
+                                <View className="flex-row justify-between items-start mb-2">
+                                    <Text className="text-textPrimary text-lg font-bold">{weeklyAvg.stress}/10</Text>
+                                    <Ionicons name="warning-outline" size={16} color="#E67E22" />
+                                </View>
+                                <Text className="text-textSecondary text-[10px] font-bold uppercase tracking-wider">Avg Stress</Text>
                             </View>
                         </View>
                     </View>

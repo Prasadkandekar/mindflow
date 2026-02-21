@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -17,28 +17,47 @@ export default function SplashScreen() {
   return (
     <LinearGradient
       colors={["#FFD1B0", "#FFF9F5"]}
-      className="flex-1 justify-center items-center"
+      style={styles.container}
     >
-      <View className="items-center">
-        {/* App Logo/Icon Container */}
-        <View className="w-40 h-40 bg-white rounded-[50px] shadow-soft justify-center items-center mb-8">
-          <Text className="text-[70px]">🌙</Text>
+      <View style={styles.center}>
+        <View style={styles.logoBox}>
+          <Text style={styles.logoEmoji}>🌙</Text>
         </View>
 
-        {/* App Name */}
-        <Text className="text-[36px] text-textPrimary font-bold tracking-tight">MoonDiary</Text>
-        <Text className="text-[18px] text-textSecondary mt-2 font-medium">Your Mindful Space</Text>
+        <Text style={styles.appName}>MoonDiary</Text>
+        <Text style={styles.tagline}>Your Mindful Space</Text>
 
-        {/* Loading Animation */}
-        <ActivityIndicator size="small" color="#FF7B1B" className="mt-12" />
+        <ActivityIndicator size="small" color="#FF7B1B" style={{ marginTop: 48 }} />
       </View>
 
-      {/* Encryption Badge */}
-      <View className="absolute bottom-12 flex-row items-center bg-white/50 px-4 py-2 rounded-full">
-        <Text className="text-[12px] text-textSecondary font-semibold">
+      <View style={styles.badge}>
+        <Text style={styles.badgeText}>
           🔒 End-to-End Encrypted
         </Text>
       </View>
     </LinearGradient>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  center: { alignItems: 'center' },
+  logoBox: {
+    width: 160, height: 160, backgroundColor: 'white',
+    borderRadius: 50, justifyContent: 'center', alignItems: 'center',
+    marginBottom: 32,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1, shadowRadius: 12, elevation: 5,
+  },
+  logoEmoji: { fontSize: 70 },
+  appName: { fontSize: 36, color: '#3D2C2E', fontWeight: 'bold', letterSpacing: -0.5 },
+  tagline: { fontSize: 18, color: '#8E7E77', marginTop: 8, fontWeight: '500' },
+  badge: {
+    position: 'absolute', bottom: 48,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999,
+  },
+  badgeText: { fontSize: 12, color: '#8E7E77', fontWeight: '600' },
+});
+

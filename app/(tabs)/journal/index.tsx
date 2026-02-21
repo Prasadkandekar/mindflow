@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../services/supabase';
 
 const ACTOR_ID = '6ceaaeea-91f5-427d-bb4e-d651e2a2fd61';
@@ -76,13 +77,15 @@ export default function JournalScreen() {
                     id,
                     content,
                     entry_date,
+                    created_at,
                     sentiment_analysis (
                         sentiment_score,
                         emotion_label
                     )
                 `)
         .eq('user_id', ACTOR_ID)
-        .order('entry_date', { ascending: false });
+        .order('entry_date', { ascending: false })
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 

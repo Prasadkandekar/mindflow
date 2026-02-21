@@ -10,7 +10,9 @@ export async function pushWellbeingScore(data: {
     sleep_avg: number;
     sentiment_avg?: number;
     composite_score: number;
-    risk_level: 'low' | 'medium' | 'high';
+    risk_level: 'low' | 'medium' | 'high' | 'critical';
+    phq9_score?: number;
+    gad7_score?: number;
 }) {
     const { error } = await supabase
         .from('wellbeing_scores')
@@ -50,18 +52,69 @@ export async function syncTodayWellbeingScore(userId: string) {
     const sleepPart = Math.min(((sleep || 7) / 8) * 100, 100); // 8h = 100
 
     const composite = Math.round((moodPart + stressPart + sleepPart) / 3);
-    const risk = composite >= 70 ? 'low' : composite >= 40 ? 'medium' : 'high';
+
+    // Estimate PHQ-9 and GAD-7
+    const phq9 = estimatePHQ9(mood);
+    const gad7 = estimateGAD7(stress);
+
+    const risk = composite >= 75 ? 'low' : composite >= 50 ? 'medium' : composite >= 30 ? 'high' : 'critical';
 
     // 3. Push to Supabase (Upsert for today)
-    return await pushWellbeingScore({
+    const result = await pushWellbeingScore({
         user_id: userId,
         mood_avg: mood || 0,
         stress_avg: stress || 0,
         sleep_avg: sleep || 0,
         sentiment_avg: sentimentAvg ? Math.round(sentimentAvg * 100) / 100 : 0,
         composite_score: composite,
-        risk_level: risk as any
+        risk_level: risk as any,
+        phq9_score: phq9 || 0,
+        gad7_score: gad7 || 0
     });
+
+    // 4. Check for interventions
+    if (phq9 !== null || gad7 !== null) {
+        await checkAndGenerateInterventions(userId, phq9, gad7);
+    }
+
+    return result;
+}
+
+/**
+ * Check scores and generate interventions in the database
+ */
+export async function checkAndGenerateInterventions(userId: string, phq9: number | null, gad7: number | null) {
+    const interventions = [];
+    const today = new Date().toISOString().split('T')[0];
+
+    if (phq9 !== null && phq9 >= 10) {
+        interventions.push({
+            user_id: userId,
+            week_start_date: today,
+            intervention_text: phq9 >= 20 ? "Your mood scores indicate severe distress. Please consider professional support immediately." : "Your mood scores indicate moderate depression symptoms. We recommend checking out our 'Heal' exercises.",
+            severity: phq9 >= 20 ? 'high' : 'medium',
+            action_type: phq9 >= 20 ? 'consultation' : 'wellness_exercise',
+            action_payload: { category: 'depression', score: phq9 },
+            status: 'pending'
+        });
+    }
+
+    if (gad7 !== null && gad7 >= 10) {
+        interventions.push({
+            user_id: userId,
+            week_start_date: today,
+            intervention_text: gad7 >= 15 ? "Your anxiety levels are very high. Try our 'Deep Relaxation' breathing exercise." : "You're experiencing moderate anxiety. Small breaks and breathing exercises can help.",
+            severity: gad7 >= 15 ? 'high' : 'medium',
+            action_type: 'wellness_exercise',
+            action_payload: { category: 'anxiety', score: gad7, recommended: 'breathing' },
+            status: 'pending'
+        });
+    }
+
+    if (interventions.length > 0) {
+        const { error } = await supabase.from('user_interventions').insert(interventions);
+        if (error) console.error('Error generating interventions:', error);
+    }
 }
 
 /**
@@ -180,16 +233,22 @@ function calculateTrends(scores: any[]) {
 
 function estimatePHQ9(moodAvg: number | null) {
     if (moodAvg === null) return null;
-    const raw = 27 * (1 - moodAvg / 100);
-    const score = Math.round(raw);
-    return Math.min(27, Math.max(0, score));
+    // Input moodAvg is 1-10 (10 being best)
+    // PHQ-9 is 0-27 (27 being worst)
+    // 10 mood -> 0-4 PHQ
+    // 1 mood -> 20-27 PHQ
+    const raw = 27 * (1 - (moodAvg - 1) / 9);
+    return Math.min(27, Math.max(0, Math.round(raw)));
 }
 
 function estimateGAD7(stressAvg: number | null) {
     if (stressAvg === null) return null;
-    const raw = 21 * (1 - stressAvg / 100);
-    const score = Math.round(raw);
-    return Math.min(21, Math.max(0, score));
+    // Input stressAvg is 1-10 (1 being best/low stress)
+    // GAD-7 is 0-21 (21 being worst/high anxiety)
+    // 1 stress -> 0-3 GAD
+    // 10 stress -> 15-21 GAD
+    const raw = 21 * ((stressAvg - 1) / 9);
+    return Math.min(21, Math.max(0, Math.round(raw)));
 }
 
 function phq9Severity(score: number | null) {

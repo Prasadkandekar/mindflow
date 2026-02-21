@@ -1,5 +1,20 @@
---schema of app use it to integrate app
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
 
+CREATE TABLE public.intervention_protocols (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  description text,
+  category text NOT NULL CHECK (category = ANY (ARRAY['preventive'::text, 'self_help'::text, 'peer_support'::text, 'professional'::text, 'crisis'::text])),
+  priority integer DEFAULT 0,
+  is_active boolean DEFAULT true,
+  triggers jsonb NOT NULL,
+  action_type text NOT NULL,
+  action_payload jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT intervention_protocols_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.interventions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid,
@@ -84,6 +99,32 @@ CREATE TABLE public.sessions (
   created_at timestamp without time zone DEFAULT now(),
   CONSTRAINT sessions_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.severity_assessments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  week_start_date date NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  phq9_total integer CHECK (phq9_total >= 0 AND phq9_total <= 27),
+  gad7_total integer CHECK (gad7_total >= 0 AND gad7_total <= 21),
+  q9_score integer CHECK (q9_score >= 0 AND q9_score <= 3),
+  tier integer NOT NULL CHECK (tier >= 0 AND tier <= 4),
+  primary_domain text CHECK (primary_domain = ANY (ARRAY['depression'::text, 'anxiety'::text, 'mixed'::text])),
+  safety_flag boolean DEFAULT false,
+  reassessment_interval_days integer DEFAULT 7,
+  clinician_recommendation text CHECK (clinician_recommendation = ANY (ARRAY['none'::text, 'suggested'::text, 'strong'::text])),
+  monitoring_intensity text CHECK (monitoring_intensity = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text])),
+  behavioral_activation_index numeric,
+  sleep_disturbance_index numeric,
+  catastrophizing_index numeric,
+  rumination_index numeric,
+  weeks_in_tier integer DEFAULT 1,
+  previous_tier integer,
+  escalation_flag boolean DEFAULT false,
+  step_down_flag boolean DEFAULT false,
+  CONSTRAINT severity_assessments_pkey PRIMARY KEY (id),
+  CONSTRAINT severity_assessments_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
+);
 CREATE TABLE public.sleep_logs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid,
@@ -130,6 +171,27 @@ CREATE TABLE public.therapists (
   created_at timestamp without time zone DEFAULT now(),
   CONSTRAINT therapists_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.user_interventions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  week_start_date date NOT NULL,
+  protocol_id uuid,
+  severity_assessment_id uuid,
+  intervention_text text NOT NULL,
+  severity text CHECK (severity = ANY (ARRAY['crisis'::text, 'high'::text, 'medium'::text, 'low'::text, 'info'::text])),
+  action_type text NOT NULL,
+  action_payload jsonb,
+  status text DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'viewed'::text, 'acted'::text, 'dismissed'::text])),
+  viewed_at timestamp with time zone,
+  acted_at timestamp with time zone,
+  dismissed_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_interventions_pkey PRIMARY KEY (id),
+  CONSTRAINT user_interventions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
+  CONSTRAINT user_interventions_protocol_id_fkey FOREIGN KEY (protocol_id) REFERENCES public.intervention_protocols(id),
+  CONSTRAINT user_interventions_severity_assessment_id_fkey FOREIGN KEY (severity_assessment_id) REFERENCES public.severity_assessments(id)
+);
 CREATE TABLE public.user_risk_history (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid,
@@ -146,8 +208,10 @@ CREATE TABLE public.wellbeing_scores (
   sleep_avg numeric,
   sentiment_avg numeric,
   composite_score numeric,
-  risk_level text CHECK (risk_level = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text])),
+  risk_level text CHECK (risk_level = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text, 'critical'::text])),
   calculated_at timestamp without time zone DEFAULT now(),
+  phq9_score integer,
+  gad7_score integer,
   CONSTRAINT wellbeing_scores_pkey PRIMARY KEY (id),
   CONSTRAINT wellbeing_scores_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );

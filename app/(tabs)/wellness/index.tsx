@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { fetchUserInterventions, Intervention } from '../../../services/intervention-service';
 import { supabase } from '../../../services/supabase';
 import { generateWeeklyReport } from '../../../services/wellness-report';
 
@@ -73,6 +74,7 @@ export default function WellnessHubScreen() {
   const [report, setReport] = React.useState<any>(null);
   const [showDetailedReport, setShowDetailedReport] = React.useState(false);
   const [profile, setProfile] = React.useState<any>(null);
+  const [interventions, setInterventions] = React.useState<Intervention[]>([]);
 
   const fetchData = React.useCallback(async () => {
     try {
@@ -84,8 +86,12 @@ export default function WellnessHubScreen() {
       if (scoreRes.data) setWellbeingScore(Number(scoreRes.data.composite_score));
       if (profileRes.data) setProfile(profileRes.data);
 
-      const reportData = await generateWeeklyReport(ACTOR_ID);
+      const [reportData, activeInterventions] = await Promise.all([
+        generateWeeklyReport(ACTOR_ID),
+        fetchUserInterventions(ACTOR_ID)
+      ]);
       setReport(reportData);
+      setInterventions(activeInterventions);
     } catch (e) {
       console.error(e);
     } finally {
@@ -137,25 +143,25 @@ export default function WellnessHubScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 24 }}
           >
-            {wellbeingScore !== null && wellbeingScore < 60 ? (
-              <>
+            {interventions.length > 0 ? (
+              interventions.map((item) => (
                 <RecommendedCard
-                  tag="Focus"
-                  title={"Deep\nRelaxation"}
-                  subtitle="Calm your mind now"
-                  color="bg-[#CEDDFB]"
-                  imageUrl="https://img.freepik.com/free-vector/meditation-concept-illustration_114360-1510.jpg"
-                  onPress={() => router.push("/wellness/breathing")}
+                  key={item.id}
+                  tag={item.severity.toUpperCase()}
+                  title={item.action_type === 'consultation' ? "Care\nSupport" : item.action_payload?.category === 'anxiety' ? "Peace\nMind" : "Deep\nRelax"}
+                  subtitle={item.intervention_text.split('.')[0]}
+                  color={item.severity === 'high' || item.severity === 'crisis' ? "bg-[#FFD1B0]" : "bg-[#CEDDFB]"}
+                  imageUrl={item.action_type === 'consultation' ? "https://img.freepik.com/free-vector/doctor-concept-illustration_114360-1268.jpg" : "https://img.freepik.com/free-vector/meditation-concept-illustration_114360-1510.jpg"}
+                  onPress={() => {
+                    if (item.action_type === 'wellness_exercise') {
+                      if (item.action_payload?.recommended === 'breathing') router.push('/wellness/breathing');
+                      else router.push('/wellness');
+                    } else if (item.action_type === 'consultation') {
+                      router.push('/chat');
+                    }
+                  }}
                 />
-                <RecommendedCard
-                  tag="Heal"
-                  title={"Safe\nSpace"}
-                  subtitle="Finding your inner peace"
-                  color="bg-[#FFD1B0]"
-                  imageUrl="https://img.freepik.com/free-vector/woman-home-relaxing-with-tea_23-2148512143.jpg"
-                  onPress={() => router.push("/wellness/sounds")}
-                />
-              </>
+              ))
             ) : (
               <>
                 <RecommendedCard
@@ -173,14 +179,6 @@ export default function WellnessHubScreen() {
                   color="bg-[#F9E7B3]"
                   imageUrl="https://img.freepik.com/free-vector/personal-diary-concept-illustration_114360-5343.jpg"
                   onPress={() => router.push("/(tabs)/journal")}
-                />
-                <RecommendedCard
-                  tag="Relax"
-                  title={"Night\nSounds"}
-                  subtitle="Drift into deep sleep"
-                  color="bg-[#FFD1B0]"
-                  imageUrl="https://img.freepik.com/free-vector/sleep-concept-illustration_114360-1282.jpg"
-                  onPress={() => router.push("/wellness/sounds")}
                 />
               </>
             )}

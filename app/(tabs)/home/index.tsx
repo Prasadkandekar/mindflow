@@ -4,8 +4,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, PanResponder, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { fetchUserInterventions, Intervention } from '../../../services/intervention-service';
 import { supabase } from '../../../services/supabase';
-
+import { checkAndGenerateInterventions } from '../../../services/wellness-report';
 
 const ACTOR_ID = '6ceaaeea-91f5-427d-bb4e-d651e2a2fd61';
 
@@ -106,14 +107,15 @@ export default function HomeDashboard() {
     const [selectedMood, setSelectedMood] = useState(7);
     const [wellbeingScore, setWellbeingScore] = useState(84);
     const [riskLevel, setRiskLevel] = useState<string>('low');
-    const [aiInsight, setAiInsight] = useState("Loading insights...");
+    const [interventions, setInterventions] = useState<Intervention[]>([]);
 
     const [weeklyAvg, setWeeklyAvg] = useState({ mood: 0, sleep: 0, stress: 0, wellness: 0 });
     const [recentSentiment, setRecentSentiment] = useState<string | null>(null);
 
     const fetchData = useCallback(async () => {
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const now = new Date();
+            const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             const lastWeek = new Date();
             lastWeek.setDate(lastWeek.getDate() - 7);
             const lastWeekStr = lastWeek.toISOString();
@@ -159,7 +161,7 @@ export default function HomeDashboard() {
                 setStreak(currentStreak);
             }
 
-            // Calculate Weekly Averages
+            let localWellnessAvg = 0;
             if (weeklyRes.data && weeklyRes.data.length > 0) {
                 const count = weeklyRes.data.length;
                 const sums = weeklyRes.data.reduce((acc, curr) => ({
@@ -169,27 +171,30 @@ export default function HomeDashboard() {
                     wellness: acc.wellness + (curr.composite_score || 0)
                 }), { mood: 0, stress: 0, sleep: 0, wellness: 0 });
 
+                localWellnessAvg = Math.round(sums.wellness / count);
                 setWeeklyAvg({
                     mood: Math.round(sums.mood / count),
                     stress: Math.round(sums.stress / count),
                     sleep: Math.round(sums.sleep / count),
-                    wellness: Math.round(sums.wellness / count)
+                    wellness: localWellnessAvg
                 });
             }
 
+            let localRecentSentiment = null;
             if (journalRes.data && journalRes.data.length > 0) {
                 // @ts-ignore - sentiment_analysis is a join
-                const sentiments = journalRes.data.map(j => j.sentiment_analysis?.[0]?.emotion_label || j.sentiment_analysis?.emotion_label).filter(Boolean);
-                if (sentiments.length > 0) setRecentSentiment(sentiments[0]);
+                const sentiments = journalRes.data.map(j => (j.sentiment_analysis as any)?.[0]?.emotion_label || (j.sentiment_analysis as any)?.emotion_label).filter(Boolean);
+                if (sentiments.length > 0) {
+                    localRecentSentiment = sentiments[0];
+                    setRecentSentiment(localRecentSentiment);
+                }
             }
 
             const currentSleep = sleepRes.data ? Number(sleepRes.data.sleep_hours) : 7;
             const currentStress = stressRes.data ? Number(stressRes.data.stress_level) : 3;
             const currentMood = moodRes.data ? Number(moodRes.data.mood_score) : null;
 
-            if (moodRes.data && sleepRes.data && stressRes.data) {
-                setIsLoggedToday(true);
-            }
+            setIsLoggedToday(!!(moodRes.data && sleepRes.data && stressRes.data));
 
             setSleepHours(currentSleep);
             setStressLevel(currentStress);
@@ -207,32 +212,33 @@ export default function HomeDashboard() {
 
             setWellbeingScore(isNaN(computed) ? 84 : computed);
 
-            // Generate Dynamic AI insight based on weekly and sentiment data
-            let insight = "Track your day to get personalized AI insights and improve your wellbeing.";
-            if (currentStress > 7) {
-                insight = "Your stress levels are quite high today. Consider a short meditation or a walk in nature.";
-            } else if (recentSentiment === 'sad' || recentSentiment === 'anxious') {
-                insight = `We noticed you've been feeling slightly ${recentSentiment} in your journals. Taking a moment for self-care can help.`;
-            } else if (currentSleep < 6) {
-                insight = "You might feel a bit tired today. Try to wind down 30 minutes earlier tonight.";
-            } else if (weeklyAvg.wellness > 80) {
-                insight = "You've had a great week! Your consistency in maintaining high wellbeing is impressive. ✨";
-            } else if (computed > 80) {
-                insight = "You're doing amazing! Your consistency is paying off. Keep it up! ✨";
-            } else if (computed < 50) {
-                insight = "It seems like a tough day. Don't forget to take deep breaths and be kind to yourself. 💛";
-            }
-            setAiInsight(insight);
+            setWellbeingScore(isNaN(computed) ? 84 : computed);
+
+            // Fetch Interventions
+            const activeInterventions = await fetchUserInterventions(ACTOR_ID);
+            setInterventions(activeInterventions);
 
         } catch (error) {
             console.error('Error fetching home data:', error);
         } finally {
             setLoading(false);
         }
-    }, [weeklyAvg.wellness, recentSentiment]);
+    }, []);
 
     useEffect(() => {
         fetchData();
+
+        // Midnight Reset Logic: Schedule a refresh for 12:00 AM local time
+        const now = new Date();
+        const midnight = new Date(now);
+        midnight.setHours(24, 0, 0, 0); // This gets the next midnight
+        const msUntilMidnight = midnight.getTime() - now.getTime();
+
+        const timer = setTimeout(() => {
+            fetchData();
+        }, msUntilMidnight);
+
+        return () => clearTimeout(timer);
     }, [fetchData]);
 
     const updateWellbeingLocally = (sleep: number, stress: number, mood: number) => {
@@ -262,7 +268,8 @@ export default function HomeDashboard() {
 
         setIsSaving(true);
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const now = new Date();
+            const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
             // Calculate metrics for wellbeing_scores
             const moodPart = selectedMood * 10;
@@ -294,6 +301,10 @@ export default function HomeDashboard() {
                 { user_id: ACTOR_ID, stress_level: stressLevel, trigger: 'general', entry_date: today }
             ]);
 
+            // Estimate PHQ-9 and GAD-7 for wellbeing_scores
+            const phq9 = Math.min(27, Math.max(0, Math.round(27 * (1 - (selectedMood - 1) / 9))));
+            const gad7 = Math.min(21, Math.max(0, Math.round(21 * ((stressLevel - 1) / 9))));
+
             const { error: scoreError } = await supabase.from('wellbeing_scores').insert([
                 {
                     user_id: ACTOR_ID,
@@ -301,7 +312,9 @@ export default function HomeDashboard() {
                     stress_avg: stressLevel,
                     sleep_avg: sleepHours,
                     composite_score: composite,
-                    risk_level: risk
+                    risk_level: risk,
+                    phq9_score: phq9,
+                    gad7_score: gad7
                 }
             ]);
 
@@ -313,6 +326,11 @@ export default function HomeDashboard() {
             if (moodError || sleepError || stressError || scoreError) {
                 throw new Error('Some logs failed to save');
             }
+
+            // check for interventions
+            await checkAndGenerateInterventions(ACTOR_ID, phq9, gad7);
+            const activeInterventions = await fetchUserInterventions(ACTOR_ID);
+            setInterventions(activeInterventions);
 
             setIsLoggedToday(true);
             Alert.alert("Daily Log Saved", "Your wellbeing today has been recorded. Check back tomorrow! ✨");
@@ -489,18 +507,38 @@ export default function HomeDashboard() {
                         </View>
                     )}
 
-                    {/* AI Insights */}
-                    <View className="mb-8 bg-white p-6 rounded-[40px] shadow-card border border-primary/10">
-                        <View className="flex-row items-center mb-3">
-                            <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-3">
-                                <Ionicons name="sparkles" size={18} color="#FF7B1B" />
-                            </View>
-                            <Text className="text-textPrimary font-bold text-lg">AI Insights</Text>
+                    {/* Recommended Interventions */}
+                    {interventions.length > 0 && (
+                        <View className="mb-8">
+                            <Text className="text-textPrimary text-xl font-bold mb-4">Recommended for You</Text>
+                            {interventions.map((item) => (
+                                <View key={item.id} className="mb-4 bg-white p-6 rounded-[32px] shadow-card border border-primary/10">
+                                    <View className="flex-row items-center mb-3">
+                                        <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${item.severity === 'high' || item.severity === 'crisis' ? 'bg-mood-stressed/10' : 'bg-primary/10'}`}>
+                                            <Ionicons name={item.severity === 'high' || item.severity === 'crisis' ? 'alert-circle' : 'sparkles'} size={18} color={item.severity === 'high' || item.severity === 'crisis' ? '#E67E22' : '#FF7B1B'} />
+                                        </View>
+                                        <Text className="text-textPrimary font-bold text-lg">Action Recommended</Text>
+                                    </View>
+                                    <Text className="text-textSecondary leading-relaxed text-sm font-medium mb-4">
+                                        {item.intervention_text}
+                                    </Text>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            if (item.action_type === 'wellness_exercise') {
+                                                if (item.action_payload?.recommended === 'breathing') router.push('/wellness/breathing');
+                                                else router.push('/wellness');
+                                            } else if (item.action_type === 'consultation') {
+                                                router.push('/chat');
+                                            }
+                                        }}
+                                        className="bg-primary/10 py-3 rounded-2xl items-center"
+                                    >
+                                        <Text className="text-primary font-bold">Try Recommendations</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ))}
                         </View>
-                        <Text className="text-textSecondary leading-relaxed text-sm font-medium">
-                            {aiInsight}
-                        </Text>
-                    </View>
+                    )}
 
                     {/* Quick Actions */}
                     <View className="mb-20">

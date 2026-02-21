@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "MoonDiary",
-    "slug": "MoonDiary",
+    "name": "MindFlow",
+    "slug": "MindFlow",
     "version": "1.0.0",
     "updates": {
       "enabled": false,
@@ -34,7 +34,10 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.WAKE_LOCK",
-        "android.permission.BLUETOOTH"
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.CHANGE_WIFI_STATE"
       ]
     },
     "web": {
@@ -56,15 +59,17 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
+    "owner": "prasadkandekar",
     "extra": {
       "eas": {
-        "projectId": "7f9d4d63-8bea-49a8-81cf-cc00c7c0492e"
+        "projectId": "4bcc2cd1-b831-4808-8da5-18608ce963e2"
       }
     }
   }

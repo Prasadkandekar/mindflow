@@ -1,6 +1,6 @@
-# 🌙 MoonDiary
+# 🌙 MindGuard
 
-**MoonDiary** is a modern, AI-powered and privacy-focused journaling app — built with **Expo**, **NativeWind**, and **Supabase**.  
+**MindGuard** is a modern, AI-powered and privacy-focused journaling app — built with **Expo**, **NativeWind**, and **Supabase**.  
 It helps users securely record their thoughts, reflect daily, and get smart insights powered by AI — all while keeping data safe and private.
 
 ---
@@ -46,8 +46,8 @@ It helps users securely record their thoughts, reflect daily, and get smart insi
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/moondiary.git
-cd moondiary
+git clone https://github.com/yourusername/MindGuard.git
+cd MindGuard
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 

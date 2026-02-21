@@ -26,7 +26,7 @@ export default function SplashScreen() {
         </View>
 
         {/* App Name */}
-        <Text className="text-[36px] text-textPrimary font-bold tracking-tight">MoonDiary</Text>
+        <Text className="text-[36px] text-textPrimary font-bold tracking-tight">MindFlow</Text>
         <Text className="text-[18px] text-textSecondary mt-2 font-medium">Your Mindful Space</Text>
 
         {/* Loading Animation */}

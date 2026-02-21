@@ -114,8 +114,11 @@ export default function HomeDashboard() {
     const fetchData = useCallback(async () => {
         try {
             const today = new Date().toISOString().split('T')[0];
+            const lastWeek = new Date();
+            lastWeek.setDate(lastWeek.getDate() - 7);
+            const lastWeekStr = lastWeek.toISOString();
 
-            const [sleepRes, stressRes, moodRes, scoreRes, profileRes, logsRes] = await Promise.all([
+            const [sleepRes, stressRes, moodRes, scoreRes, profileRes, logsRes, weeklyRes, journalRes] = await Promise.all([
                 supabase.from('sleep_logs').select('sleep_hours, sleep_quality').eq('user_id', ACTOR_ID).eq('entry_date', today).maybeSingle(),
                 supabase.from('stress_logs').select('stress_level, trigger').eq('user_id', ACTOR_ID).eq('entry_date', today).maybeSingle(),
                 supabase.from('mood_logs').select('mood_score').eq('user_id', ACTOR_ID).eq('entry_date', today).maybeSingle(),

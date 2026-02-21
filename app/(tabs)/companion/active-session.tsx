@@ -35,18 +35,43 @@ export default function ActiveSessionScreen() {
 // evaluated on native platforms (iOS / Android).
 
 function NativeSessionScreen() {
-  const { AudioSession, LiveKitRoom } = require('@livekit/react-native');
+  const livekit = require('@livekit/react-native');
+  const AudioSession = livekit?.AudioSession;
+  const LiveKitRoom = livekit?.LiveKitRoom;
+
   const { token, url } = useLocalSearchParams<{ token: string; url: string }>();
 
   useEffect(() => {
+    if (!AudioSession) {
+      console.error('LiveKit AudioSession is not available. Ensure you are running a development build.');
+      return;
+    }
     const start = async () => {
-      await AudioSession.startAudioSession();
+      try {
+        await AudioSession.startAudioSession();
+      } catch (e) {
+        console.error('Failed to start audio session:', e);
+      }
     };
     start();
     return () => {
       AudioSession.stopAudioSession();
     };
-  }, []);
+  }, [AudioSession]);
+
+  if (!LiveKitRoom || !AudioSession) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Animated.Text style={{ textAlign: 'center' }}>
+            LiveKit native module not found. {"\n\n"}
+            This feature requires a Development Build (npx expo run:android/ios).
+            It will not work in Expo Go.
+          </Animated.Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const serverUrl = (url as string) || 'wss://mental-wellness-3z07873b.livekit.cloud';
 
@@ -68,19 +93,23 @@ function NativeSessionScreen() {
 // ─── Room View ────────────────────────────────────────────────────────────────
 
 const RoomView = () => {
+  const livekit = require('@livekit/react-native');
   const {
     useIOSAudioManagement,
     useLocalParticipant,
     useParticipantTracks,
     useRoomContext,
     VideoTrack,
-  } = require('@livekit/react-native');
+  } = livekit;
+
   const { Track } = require('livekit-client');
 
   const router = useRouter();
 
   const room = useRoomContext();
-  useIOSAudioManagement(room, true);
+  if (useIOSAudioManagement && room) {
+    useIOSAudioManagement(room, true);
+  }
 
   const {
     isMicrophoneEnabled,

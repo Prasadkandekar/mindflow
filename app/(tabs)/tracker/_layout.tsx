@@ -6,6 +6,10 @@ export default function TrackerLayout() {
             <Stack.Screen name="index" />
             <Stack.Screen name="streak" />
             <Stack.Screen name="rewards" />
+            <Stack.Screen name="mood-log" />
+            <Stack.Screen name="sleep-log" />
+            <Stack.Screen name="stress-log" />
         </Stack>
     );
 }
+

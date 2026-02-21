@@ -1,16 +1,12 @@
 import { Transcription } from '@/hooks/useDataStreamTranscriptions';
-import { Platform } from 'react-native';
-import { useLocalParticipant } from '@livekit/components-react';
 import { useCallback } from 'react';
 import {
-  ListRenderItemInfo,
-  StyleProp,
+  FlatList, ListRenderItemInfo, Platform, StyleProp,
   StyleSheet,
   Text,
   View,
-  ViewStyle,
+  ViewStyle
 } from 'react-native';
-import Animated, { LinearTransition } from 'react-native-reanimated';
 
 export type ChatLogProps = {
   style: StyleProp<ViewStyle>;
@@ -25,8 +21,15 @@ export default function ChatLog({ style, transcriptions }: ChatLogProps) {
 }
 
 function NativeChatLog({ style, transcriptions }: ChatLogProps) {
-  const { localParticipant } = useLocalParticipant();
-  const localParticipantIdentity = localParticipant.identity;
+  // Conditionally require LiveKit to avoid crash when native module isn't linked
+  let localParticipantIdentity = 'local';
+  try {
+    const { useLocalParticipant } = require('@livekit/components-react');
+    const { localParticipant } = useLocalParticipant();
+    localParticipantIdentity = localParticipant.identity;
+  } catch (e) {
+    console.warn('LiveKit components-react not available:', e);
+  }
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<Transcription>) => {
@@ -40,13 +43,14 @@ function NativeChatLog({ style, transcriptions }: ChatLogProps) {
     [localParticipantIdentity]
   );
 
+  // Use standard FlatList instead of Animated.FlatList from react-native-reanimated
+  // to avoid NullPointerException crash when Reanimated native module isn't available
   return (
-    <Animated.FlatList
+    <FlatList
       renderItem={renderItem}
       data={transcriptions}
       style={style}
       inverted={true}
-      itemLayoutAnimation={LinearTransition}
     />
   );
 }

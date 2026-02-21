@@ -1,6 +1,7 @@
 import { Buffer } from 'buffer';
 import { Stack } from "expo-router";
 import { Platform } from "react-native";
+import 'react-native-get-random-values';
 import { SafeAreaView } from "react-native-safe-area-context";
 import "../global.css";
 
@@ -15,8 +16,12 @@ if (typeof global.Buffer === 'undefined') {
 // Guarded to native-only since LiveKit is stubbed on web via metro.config.js.
 if (Platform.OS !== 'web') {
   try {
-    const { registerGlobals } = require('@livekit/react-native');
-    registerGlobals();
+    const livekit = require('@livekit/react-native');
+    if (livekit && livekit.registerGlobals) {
+      livekit.registerGlobals();
+    } else {
+      console.warn('LiveKit registerGlobals not found. This is expected in Expo Go.');
+    }
   } catch (e) {
     console.warn('LiveKit globals failed to register. This is expected in Expo Go if not using a development build.', e);
   }

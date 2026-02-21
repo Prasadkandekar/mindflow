@@ -4,9 +4,9 @@ import { Platform } from 'react-native';
 // The token endpoint (your ngrok or backend server URL)
 // For Android emulator, use 10.0.2.2 instead of localhost
 const TOKEN_ENDPOINT = Platform.select({
-    android: 'http://10.0.2.2:3000/getToken',
-    ios: 'http://localhost:3000/getToken',
-    default: 'http://localhost:3000/getToken',
+    android: 'https://voice-agent-token-generator.onrender.com/getToken',
+    ios: 'https://voice-agent-token-generator.onrender.com/getToken',
+    default: 'https://voice-agent-token-generator.onrender.com/getToken',
 });
 
 /**

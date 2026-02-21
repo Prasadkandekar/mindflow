@@ -1,7 +1,25 @@
+// Apply polyfill before anything else
+require('./metro-setup');
+
 const { getDefaultConfig } = require("expo/metro-config");
 const { withNativeWind } = require('nativewind/metro');
 
 const config = getDefaultConfig(__dirname);
+
+// Suppress specific warnings
+const originalWarn = console.warn;
+console.warn = (...args) => {
+  const message = args[0];
+  if (
+    typeof message === 'string' &&
+    (message.includes('event-target-shim') || 
+     message.includes('Attempted to import the module'))
+  ) {
+    // Suppress event-target-shim warnings
+    return;
+  }
+  originalWarn(...args);
+};
 
 // Stub native-only LiveKit packages on web — these use native WebRTC bindings.
 // NOTE: `livekit-client` and `@livekit/components-react` are NOT stubbed —

@@ -1,4 +1,5 @@
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Platform,
@@ -7,7 +8,6 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -40,22 +40,37 @@ function NativeSessionScreen() {
   const LiveKitRoom = livekit?.LiveKitRoom;
 
   const { token, url } = useLocalSearchParams<{ token: string; url: string }>();
+  const [audioSessionReady, setAudioSessionReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!AudioSession) {
-      console.error('LiveKit AudioSession is not available. Ensure you are running a development build.');
+      console.error('[AudioSession] LiveKit AudioSession is not available. Ensure you are running a development build.');
+      setError('LiveKit AudioSession not available');
       return;
     }
+
     const start = async () => {
       try {
+        console.log('[AudioSession] Starting audio session...');
         await AudioSession.startAudioSession();
+        console.log('[AudioSession] Audio session started successfully');
+        setAudioSessionReady(true);
       } catch (e) {
-        console.error('Failed to start audio session:', e);
+        console.error('[AudioSession] Failed to start audio session:', e);
+        setError(`Audio session failed: ${e}`);
       }
     };
+
     start();
+
     return () => {
-      AudioSession.stopAudioSession();
+      console.log('[AudioSession] Stopping audio session...');
+      try {
+        AudioSession.stopAudioSession();
+      } catch (e) {
+        console.error('[AudioSession] Error stopping audio session:', e);
+      }
     };
   }, [AudioSession]);
 
@@ -73,7 +88,49 @@ function NativeSessionScreen() {
     );
   }
 
+  if (error) {
+    console.error('[LiveKit] Error state:', error);
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Animated.Text style={{ textAlign: 'center', color: 'red' }}>
+            Error: {error}
+          </Animated.Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!token || !url) {
+    console.error('[LiveKit] Missing connection details - token:', !!token, 'url:', !!url);
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Animated.Text style={{ textAlign: 'center' }}>
+            Missing connection details. Please try again.
+          </Animated.Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!audioSessionReady) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <ActivityIndicator size="large" color="#FF7B1B" />
+          <Animated.Text style={{ textAlign: 'center', marginTop: 16 }}>
+            Initializing audio session...
+          </Animated.Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const serverUrl = (url as string) || 'wss://mental-wellness-3z07873b.livekit.cloud';
+
+  console.log('[LiveKit] Connecting to:', serverUrl);
+  console.log('[LiveKit] Token length:', token?.length);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -83,6 +140,16 @@ function NativeSessionScreen() {
         connect={true}
         audio={true}
         video={false}
+        onConnected={() => {
+          console.log('[LiveKit] ✅ Successfully connected to room');
+        }}
+        onDisconnected={(reason : any) => {
+          console.log('[LiveKit] ❌ Disconnected from room:', reason);
+        }}
+        onError={(error : any) => {
+          console.error('[LiveKit] ⚠️ Room error:', error);
+          setError(`LiveKit error: ${error}`);
+        }}
       >
         <RoomView />
       </LiveKitRoom>
@@ -101,14 +168,47 @@ const RoomView = () => {
     useRoomContext,
     VideoTrack,
   } = livekit;
-
   const { Track } = require('livekit-client');
 
   const router = useRouter();
-
   const room = useRoomContext();
+  const [roomError, setRoomError] = useState<string | null>(null);
+
+  // Wrap room context usage in try-catch
+  useEffect(() => {
+    if (!room) {
+      console.error('[RoomView] Room context is null');
+      setRoomError('Room context not available');
+    }
+  }, [room]);
+
+  if (roomError) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <Animated.Text style={{ textAlign: 'center', color: 'red' }}>
+          Room Error: {roomError}
+        </Animated.Text>
+      </View>
+    );
+  }
+
+  if (!room) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <ActivityIndicator size="large" color="#FF7B1B" />
+        <Animated.Text style={{ textAlign: 'center', marginTop: 16 }}>
+          Connecting to room...
+        </Animated.Text>
+      </View>
+    );
+  }
+
   if (useIOSAudioManagement && room) {
-    useIOSAudioManagement(room, true);
+    try {
+      useIOSAudioManagement(room, true);
+    } catch (e) {
+      console.error('[RoomView] iOS audio management error:', e);
+    }
   }
 
   const {
@@ -118,6 +218,7 @@ const RoomView = () => {
     cameraTrack: localCameraTrack,
     localParticipant,
   } = useLocalParticipant();
+
   const localParticipantIdentity = localParticipant.identity;
 
   const localScreenShareTrack = useParticipantTracks(
@@ -128,17 +229,18 @@ const RoomView = () => {
   const localVideoTrack =
     localCameraTrack && isCameraEnabled
       ? {
-        participant: localParticipant,
-        publication: localCameraTrack,
-        source: Track.Source.Camera,
-      }
+          participant: localParticipant,
+          publication: localCameraTrack,
+          source: Track.Source.Camera,
+        }
       : localScreenShareTrack.length > 0 && isScreenShareEnabled
-        ? localScreenShareTrack[0]
-        : null;
+      ? localScreenShareTrack[0]
+      : null;
 
   // Transcriptions
   const transcriptionState = useDataStreamTranscriptions();
   const addTranscription = transcriptionState.addTranscription;
+
   const [isChatEnabled, setChatEnabled] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
 
@@ -152,14 +254,17 @@ const RoomView = () => {
 
   // Control callbacks
   const onMicClick = useCallback(() => {
+    console.log('[Controls] Toggling microphone:', !isMicrophoneEnabled);
     localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
   }, [isMicrophoneEnabled, localParticipant]);
 
   const onCameraClick = useCallback(() => {
+    console.log('[Controls] Toggling camera:', !isCameraEnabled);
     localParticipant.setCameraEnabled(!isCameraEnabled);
   }, [isCameraEnabled, localParticipant]);
 
   const onScreenShareClick = useCallback(() => {
+    console.log('[Controls] Toggling screen share:', !isScreenShareEnabled);
     localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
   }, [isScreenShareEnabled, localParticipant]);
 
@@ -168,17 +273,23 @@ const RoomView = () => {
   }, [isChatEnabled, setChatEnabled]);
 
   const onExitClick = useCallback(() => {
+    console.log('[Controls] Exiting session');
     router.back();
   }, [router]);
 
   // Layout positioning
-  const [containerWidth, setContainerWidth] = useState(Dimensions.get('window').width);
-  const [containerHeight, setContainerHeight] = useState(Dimensions.get('window').height);
+  const [containerWidth, setContainerWidth] = useState(
+    Dimensions.get('window').width
+  );
+  const [containerHeight, setContainerHeight] = useState(
+    Dimensions.get('window').height
+  );
 
   const agentVisualizationPosition = useAgentVisualizationPosition(
     isChatEnabled,
     isCameraEnabled || isScreenShareEnabled
   );
+
   const localVideoPosition = useLocalVideoPosition(isChatEnabled, {
     width: containerWidth,
     height: containerHeight,
@@ -208,10 +319,12 @@ const RoomView = () => {
       }}
     >
       <View style={styles.spacer} />
+
       <ChatLog
         style={styles.logContainer}
         transcriptions={transcriptionState.transcriptions}
       />
+
       <ChatBar
         style={styles.chatBar}
         value={chatMessage}
@@ -322,8 +435,12 @@ const useAgentVisualizationPosition = (
   isChatVisible: boolean,
   hasLocalVideo: boolean
 ) => {
-  const width = useAnimatedValue(isChatVisible ? collapsedWidth : expandedAgentWidth);
-  const height = useAnimatedValue(isChatVisible ? collapsedHeight : expandedAgentHeight);
+  const width = useAnimatedValue(
+    isChatVisible ? collapsedWidth : expandedAgentWidth
+  );
+  const height = useAnimatedValue(
+    isChatVisible ? collapsedHeight : expandedAgentHeight
+  );
 
   useEffect(() => {
     const widthAnim = Animated.spring(
@@ -334,8 +451,10 @@ const useAgentVisualizationPosition = (
       height,
       createAnimConfig(isChatVisible ? collapsedHeight : expandedAgentHeight)
     );
+
     widthAnim.start();
     heightAnim.start();
+
     return () => {
       widthAnim.stop();
       heightAnim.stop();
@@ -364,6 +483,7 @@ const useAgentVisualizationPosition = (
 
     const xAnim = Animated.spring(x, createAnimConfig(targetX));
     const yAnim = Animated.spring(y, createAnimConfig(targetY));
+
     xAnim.start();
     yAnim.start();
 
@@ -385,8 +505,12 @@ const useLocalVideoPosition = (
   isChatVisible: boolean,
   containerDimens: { width: number; height: number }
 ): ViewStyle => {
-  const width = useAnimatedValue(isChatVisible ? collapsedWidth : expandedLocalWidth);
-  const height = useAnimatedValue(isChatVisible ? collapsedHeight : expandedLocalHeight);
+  const width = useAnimatedValue(
+    isChatVisible ? collapsedWidth : expandedLocalWidth
+  );
+  const height = useAnimatedValue(
+    isChatVisible ? collapsedHeight : expandedLocalHeight
+  );
 
   useEffect(() => {
     const widthAnim = Animated.spring(
@@ -397,8 +521,10 @@ const useLocalVideoPosition = (
       height,
       createAnimConfig(isChatVisible ? collapsedHeight : expandedLocalHeight)
     );
+
     widthAnim.start();
     heightAnim.start();
+
     return () => {
       widthAnim.stop();
       heightAnim.stop();
@@ -422,6 +548,7 @@ const useLocalVideoPosition = (
 
     const xAnim = Animated.spring(x, createAnimConfig(targetX));
     const yAnim = Animated.spring(y, createAnimConfig(targetY));
+
     xAnim.start();
     yAnim.start();
 

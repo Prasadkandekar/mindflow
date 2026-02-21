@@ -47,7 +47,7 @@ export default function ProfileScreen() {
                 <View className="mt-8">
                     <Text className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Support</Text>
                     <MenuItem icon="help-circle-outline" title="Help Center" />
-                    <MenuItem icon="information-circle-outline" title="About MoonDiary" />
+                    <MenuItem icon="information-circle-outline" title="About MindFlow" />
                 </View>
 
                 <TouchableOpacity className="mt-12 mb-8 flex-row items-center justify-center bg-rose-50 p-4 rounded-2xl">

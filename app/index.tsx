@@ -24,8 +24,9 @@ export default function SplashScreen() {
           <Text style={styles.logoEmoji}>🌙</Text>
         </View>
 
-        <Text style={styles.appName}>MoonDiary</Text>
-        <Text style={styles.tagline}>Your Mindful Space</Text>
+        {/* App Name */}
+        <Text className="text-[36px] text-textPrimary font-bold tracking-tight">MindFlow</Text>
+        <Text className="text-[18px] text-textSecondary mt-2 font-medium">Your Mindful Space</Text>
 
         <ActivityIndicator size="small" color="#FF7B1B" style={{ marginTop: 48 }} />
       </View>

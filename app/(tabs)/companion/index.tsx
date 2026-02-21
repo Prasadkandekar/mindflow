@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Platform,
   SafeAreaView,
   Text,
   TextInput,
@@ -12,27 +14,61 @@ import {
 } from 'react-native';
 import { fetchToken } from '@/hooks/useConnectionDetails';
 
+// Check if LiveKit is available (development build vs Expo Go)
+const isLiveKitAvailable = () => {
+  if (Platform.OS === 'web') return true; // Web uses livekit-client
+  try {
+    const livekit = require('@livekit/react-native');
+    return !!(livekit && livekit.registerGlobals);
+  } catch {
+    return false;
+  }
+};
+
 export default function VoiceCompanionScreen() {
   const router = useRouter();
   const [isConnecting, setIsConnecting] = useState(false);
 
   const startSession = async () => {
+    // Check if LiveKit is available before attempting connection
+    if (!isLiveKitAvailable()) {
+      Alert.alert(
+        'Development Build Required',
+        'Voice companion requires a development build to work.\n\n' +
+        'To use this feature:\n' +
+        '1. Run: npx expo run:android (or ios)\n' +
+        '2. Or build with: npx eas build --profile development\n\n' +
+        'This feature does not work in Expo Go.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     try {
       setIsConnecting(true);
+      console.log('[Companion] Fetching token...');
       const details = await fetchToken();
+      console.log('[Companion] Token fetched:', !!details?.token);
       setIsConnecting(false);
 
-      if (details?.token) {
+      if (details?.token && details?.url) {
+        console.log('[Companion] Navigating to active-session with token');
+        // Use replace instead of push to avoid back navigation issues
         router.push({
-          pathname: '/companion/active-session',
-          params: { token: details.token, url: details.url },
+          pathname: '/(tabs)/companion/active-session',
+          params: { 
+            token: details.token, 
+            url: details.url 
+          },
         });
       } else {
-        console.error('Could not fetch LiveKit token');
+        console.error('[Companion] Could not fetch LiveKit token or URL');
+        Alert.alert('Connection Failed', 'Failed to connect. Please check your internet connection and try again.');
       }
     } catch (error) {
       setIsConnecting(false);
-      console.error('Connection error:', error);
+      console.error('[Companion] Connection error:', error);
+      Alert.alert('Connection Error', error instanceof Error ? error.message : 'Unknown error occurred');
     }
   };
 
@@ -48,6 +84,19 @@ export default function VoiceCompanionScreen() {
           <Ionicons name="ellipsis-vertical" size={20} color="#2D1E17" />
         </TouchableOpacity>
       </View>
+
+      {/* Development Build Warning */}
+      {!isLiveKitAvailable() && (
+        <View className="mx-6 mt-4 bg-secondary/20 p-4 rounded-2xl border border-secondary/30">
+          <View className="flex-row items-center mb-2">
+            <Ionicons name="warning" size={20} color="#FF7B1B" />
+            <Text className="text-textPrimary font-bold ml-2">Development Build Required</Text>
+          </View>
+          <Text className="text-textSecondary text-xs">
+            Voice features require a development build. Run: npx expo run:android
+          </Text>
+        </View>
+      )}
 
       <View className="flex-1 items-center justify-center px-8">
         <Text className="text-textSecondary text-center font-medium mb-8">
@@ -104,17 +153,6 @@ export default function VoiceCompanionScreen() {
 
       {/* Bottom Interaction Bar */}
       <View className="px-6 pb-32">
-        {/* Action Chips */}
-        <View className="flex-row justify-center gap-2 mb-6">
-          <TouchableOpacity className="flex-row items-center bg-white px-4 py-2.5 rounded-full shadow-card border border-secondary/10">
-            <Ionicons name="image-outline" size={16} color="#FF7B1B" />
-            <Text className="text-textPrimary text-xs font-bold ml-2">Generate Image</Text>
-          </TouchableOpacity>
-          <TouchableOpacity className="flex-row items-center bg-white px-4 py-2.5 rounded-full shadow-card border border-secondary/10">
-            <Ionicons name="videocam-outline" size={16} color="#FF7B1B" />
-            <Text className="text-textPrimary text-xs font-bold ml-2">Generate Video</Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Floating Input Bar */}
         <View className="flex-row items-center bg-[#2D1E17] p-2 rounded-full shadow-soft">

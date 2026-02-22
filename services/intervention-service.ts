@@ -1,3 +1,4 @@
+import { ToolCategory, WELLNESS_TOOLS } from '../constants/tools';
 import { supabase } from './supabase';
 
 export interface Intervention {
@@ -49,3 +50,31 @@ export async function updateInterventionStatus(interventionId: string, status: '
     if (error) throw error;
     return { success: true };
 }
+
+/**
+ * Get "soft" recommendations based on current wellbeing score
+ * Returns tools from the registry that match the user's current risk level
+ */
+export function getSmartRecommendations(compositeScore: number) {
+    let categories: ToolCategory[] = [];
+
+    if (compositeScore >= 80) {
+        categories = ['preventive']; // Focus on growth and habits
+    } else if (compositeScore >= 60) {
+        categories = ['preventive', 'light_cbt']; // Prevention + early support
+    } else if (compositeScore >= 40) {
+        categories = ['light_cbt', 'structured']; // Needs more structure
+    } else if (compositeScore >= 20) {
+        categories = ['intensive']; // Requires daily monitoring
+    } else {
+        categories = ['priority']; // Crisis/Immediate support
+    }
+
+    return WELLNESS_TOOLS.filter(tool => categories.includes(tool.category)).map(tool => {
+        if (tool.id === 'intensive-support' || tool.id === 'priority-support') {
+            return { ...tool, route: '/wellness/therapy-scheduler' };
+        }
+        return tool;
+    });
+}
+

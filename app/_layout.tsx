@@ -19,7 +19,7 @@ if (Platform.OS !== 'web' && !isLiveKitRegistered) {
       isLiveKitRegistered = true;
     }
   } catch (e) {
-    console.warn('LiveKit globals failed to register. Expected in Expo Go.', e);
+    console.log('LiveKit registration skipped (expected in Expo Go)');
   }
 }
 
